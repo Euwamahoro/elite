@@ -1,7 +1,6 @@
-// src/pages/PurchaseOrders.tsx - FINAL PO IMPLEMENTATION WITH DYNAMIC SUPPLIER/ITEM CREATION
+// src/pages/PurchaseOrders.tsx - FINAL DEFINITIVE VERSION
 import React, { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
-// Import all necessary functions and the base 'api' instance
 import { getPOs, receivePO, getSuppliers, createPO, getProducts, createSupplier } from '../api/apiService'; 
 import { Supplier, Product } from '../types/models'; 
 import '../styles/Global.css'; 
@@ -11,11 +10,12 @@ interface POItemForm {
     product: string; // Product ID
     quantity: number;
     unitCost: number;
+    unitPrice: number; // User-defined Selling Price
 }
 
 const initialPOFormData = {
-    supplier: '', // Supplier ID or new supplier name string
-    isNewSupplier: false, // Flag for UI
+    supplier: '', 
+    isNewSupplier: false, 
     poNumber: '',
     items: [] as POItemForm[],
 };
@@ -23,7 +23,7 @@ const initialPOFormData = {
 const PurchaseOrders: React.FC = () => {
     const [pos, setPos] = useState<any[]>([]); 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]); 
-    const [availableProducts, setAvailableProducts] = useState<Product[]>([]); // New state
+    const [availableProducts, setAvailableProducts] = useState<Product[]>([]); 
     const [loading, setLoading] = useState(true);
     const [showCreatePOModal, setShowCreatePOModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,6 +33,7 @@ const PurchaseOrders: React.FC = () => {
     const [itemProduct, setItemProduct] = useState('');
     const [itemQuantity, setItemQuantity] = useState(1);
     const [itemCost, setItemCost] = useState(0);
+    const [itemSellingPrice, setItemSellingPrice] = useState(0); 
 
     const fetchAllData = async () => {
         try {
@@ -59,8 +60,8 @@ const PurchaseOrders: React.FC = () => {
     
     // --- PO Item Management ---
     const handleAddItem = () => {
-        if (!itemProduct || itemQuantity <= 0 || itemCost <= 0) {
-            alert('Please select product, quantity, and cost.');
+        if (!itemProduct || itemQuantity <= 0 || itemCost <= 0 || itemSellingPrice <= 0) { 
+            alert('Please select product, quantity, unit cost, and a unit selling price.');
             return;
         }
         
@@ -68,6 +69,7 @@ const PurchaseOrders: React.FC = () => {
             product: itemProduct,
             quantity: itemQuantity,
             unitCost: itemCost,
+            unitPrice: itemSellingPrice, 
         };
 
         setPoFormData(prev => ({
@@ -75,10 +77,10 @@ const PurchaseOrders: React.FC = () => {
             items: [...prev.items, newItem]
         }));
 
-        // Reset item fields
         setItemProduct('');
         setItemQuantity(1);
         setItemCost(0);
+        setItemSellingPrice(0); 
     };
 
     // --- Core PO Submission Logic ---
@@ -104,19 +106,20 @@ const PurchaseOrders: React.FC = () => {
             await createPO({
                 supplier: finalSupplierId,
                 poNumber: poFormData.poNumber,
-                poItems: poFormData.items, // Send the fully-formed item array
+                poItems: poFormData.items, 
             });
             
-            alert('Purchase Order created successfully!');
+            alert('Purchase Order created successfully! You can now receive stock.');
             setShowCreatePOModal(false);
             setPoFormData(initialPOFormData);
-            fetchAllData(); // Refresh all lists
+            fetchAllData(); 
         } catch (error: any) {
+            console.error("PO Creation Failed:", error.response?.data?.message);
             setError(error.response?.data?.message || 'Failed to create Purchase Order.');
         }
     };
 
-    // --- Po Receive Logic ---
+    // --- Po Receive Logic (Working and Robust) ---
     const handleReceivePO = async (id: string, poNumber: string) => {
         if (!window.confirm(`Confirm receipt of PO ${poNumber}? This will increase stock.`)) {
             return;
@@ -126,10 +129,14 @@ const PurchaseOrders: React.FC = () => {
             alert(`PO ${poNumber} received and stock updated successfully!`);
             fetchAllData();
         } catch (error: any) {
-            alert(error.response?.data?.message || 'Failed to receive PO.');
+            // Robust Error Handling for all 400/500 errors
+            const backendError = error.response?.data?.message || 'The server failed to receive the PO.';
+            alert(`Failed to receive PO ${poNumber}.\nReason: ${backendError}`);
+            console.error("Receive PO Failed:", error);
         }
     };
 
+    // --- UI Helpers ---
     const getStatusClass = (status: string) => {
         if (status === 'Received') return 'status-cleared';
         if (status === 'Cancelled') return 'status-pending';
@@ -236,29 +243,36 @@ const PurchaseOrders: React.FC = () => {
 
                             {/* 3. ITEM SELECTION (Dynamic) */}
                             <fieldset className="fieldset-items">
-                                <legend>Add Items (Cost/Qty)</legend>
+                                <legend>Add Items (Cost/Qty/Price)</legend>
                                 <div className="item-input-group" style={{ marginBottom: '15px' }}>
-                                    <select value={itemProduct} onChange={(e) => setItemProduct(e.target.value)} style={{ width: '40%' }}>
-                                        <option value="">-- Select Product --</option>
+                                    <select value={itemProduct} onChange={(e) => setItemProduct(e.target.value)} style={{ width: '25%' }}>
+                                        <option value="">-- Product --</option>
                                         {availableProducts.map(p => (
-                                            <option key={p._id} value={p._id}>{p.name} ({p.unitOfMeasure})</option>
+                                            <option key={p._id} value={p._id}>{p.name}</option>
                                         ))}
                                     </select>
                                     <input 
-                                        type="text" // Using text to allow free typing
+                                        type="text" 
                                         placeholder="Quantity" 
                                         value={itemQuantity} 
                                         onChange={(e) => setItemQuantity(parseInt(e.target.value.replace(/,/g, '')) || 0)} 
                                         style={{ width: '25%' }}
                                     />
                                     <input 
-                                        type="text" // Using text to allow free typing
-                                        placeholder="Unit Cost (RWF)" 
+                                        type="text" 
+                                        placeholder="Unit Cost" 
                                         value={itemCost} 
                                         onChange={(e) => setItemCost(parseFloat(e.target.value.replace(/,/g, '')) || 0)} 
                                         style={{ width: '25%' }}
                                     />
-                                    <button type="button" className="btn-success" onClick={handleAddItem} disabled={!itemProduct || itemQuantity <= 0 || itemCost <= 0}>Add</button>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Unit Selling Price" 
+                                        value={itemSellingPrice} 
+                                        onChange={(e) => setItemSellingPrice(parseFloat(e.target.value.replace(/,/g, '')) || 0)} 
+                                        style={{ width: '25%' }}
+                                    />
+                                    <button type="button" className="btn-success" onClick={handleAddItem} disabled={!itemProduct || itemQuantity <= 0 || itemCost <= 0 || itemSellingPrice <= 0}>Add</button>
                                 </div>
                                 
                                 {/* Current Items List */}
@@ -268,8 +282,8 @@ const PurchaseOrders: React.FC = () => {
                                         const subtotal = item.quantity * item.unitCost;
                                         return (
                                             <li key={index} className="item-tag" style={{ justifyContent: 'space-between' }}>
-                                                <span>{item.quantity} x {product?.name} @ {item.unitCost.toLocaleString('en-RW')} RWF</span>
-                                                <span style={{ fontWeight: 'bold' }}>Total: {subtotal.toLocaleString('en-RW')} RWF</span>
+                                                <span>{item.quantity} x {product?.name} @ Cost: {item.unitCost.toLocaleString('en-RW')} / Selling: {item.unitPrice.toLocaleString('en-RW')} RWF</span>
+                                                <span style={{ fontWeight: 'bold' }}>Total Cost: {subtotal.toLocaleString('en-RW')} RWF</span>
                                                 <button type="button" className="btn-delete btn-xs" onClick={() => setPoFormData(prev => ({...prev, items: prev.items.filter((_, i) => i !== index)}))}>X</button>
                                             </li>
                                         );
