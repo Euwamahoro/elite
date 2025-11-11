@@ -36,7 +36,7 @@ const Sidebar: React.FC = () => {
 
             {/* Sidebar */}
             <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-                <h1 className="sidebar-logo">ts</h1>
+                <h1 className="sidebar-logo">em</h1>
                 <h3 className="sidebar-menu-title">MENU</h3>
                 <nav className="sidebar-nav">
                     <NavLink 

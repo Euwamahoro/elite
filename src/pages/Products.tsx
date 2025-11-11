@@ -1,4 +1,4 @@
-// src/pages/Products.tsx - FINAL UPDATED VERSION
+// src/pages/Products.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { 
@@ -6,7 +6,8 @@ import {
     deleteProduct, 
     getProductCategories,
     createProduct,
-    createProductCategory 
+    createProductCategory,
+    updateProduct // <-- ADD THIS IMPORT
 } from '../api/apiService';
 import { Product, ProductCategory, ProductFormData } from '../types/models';
 import { useAppSelector } from '../store/hooks';
@@ -26,9 +27,10 @@ const Products: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
-    const [showCategoryModal, setShowCategoryModal] = useState(false); // <-- NEW STATE
-    const [newCategoryName, setNewCategoryName] = useState(''); // <-- NEW STATE
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null); // <-- NEW STATE
 
     const isBoss = useAppSelector(selectIsBoss);
 
@@ -53,16 +55,27 @@ const Products: React.FC = () => {
         fetchProductsAndCategories();
     }, []);
     
-    // --- NEW: Category Submission Handler ---
+    // --- Edit Product Handler ---
+    const handleEdit = (product: Product) => {
+        setEditingProduct(product);
+        setFormData({
+            category: product.category._id,
+            name: product.name,
+            description: product.description || '',
+            unitOfMeasure: product.unitOfMeasure,
+        });
+        setShowModal(true);
+    };
+
+    // --- Category Submission Handler ---
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Note: The API must be called with a body matching the backend schema { name: string }
             await createProductCategory({ name: newCategoryName }); 
             alert(`Category '${newCategoryName}' created successfully!`);
             setShowCategoryModal(false);
             setNewCategoryName('');
-            fetchProductsAndCategories(); // Refresh both lists
+            fetchProductsAndCategories();
         } catch (error: any) {
             alert(error.response?.data?.message || 'Failed to create category.');
         }
@@ -89,17 +102,34 @@ const Products: React.FC = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleCreateProduct = async (e: React.FormEvent) => {
+    // --- Updated: Handle both Create and Update ---
+    const handleSubmitProduct = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await createProduct(formData);
-            alert('Product created successfully!');
+            if (editingProduct) {
+                // Update existing product
+                await updateProduct(editingProduct._id, formData);
+                alert('Product updated successfully!');
+            } else {
+                // Create new product
+                await createProduct(formData);
+                alert('Product created successfully!');
+            }
+            
             setShowModal(false);
             setFormData(initialFormData);
+            setEditingProduct(null);
             fetchProductsAndCategories();
         } catch (error: any) {
-            setError(error.response?.data?.message || 'Failed to create product.');
+            setError(error.response?.data?.message || `Failed to ${editingProduct ? 'update' : 'create'} product.`);
         }
+    };
+
+    // --- Reset form when modal closes ---
+    const handleCloseModal = () => {
+        setShowModal(false);
+        setFormData(initialFormData);
+        setEditingProduct(null);
     };
 
     if (loading) return <Layout pageTitle="Product Inventory"><div>Loading Products...</div></Layout>;
@@ -109,7 +139,6 @@ const Products: React.FC = () => {
             <div className="page-header">
                 <h2>All Products ({products.length})</h2>
                 <div>
-                    {/* ADD CATEGORY BUTTON */}
                     <button className="btn-secondary" onClick={() => setShowCategoryModal(true)}>+ Add Category</button>
                     <button className="btn-success" onClick={() => setShowModal(true)} style={{ marginLeft: '10px' }}>Add New Product</button>
                 </div>
@@ -118,7 +147,6 @@ const Products: React.FC = () => {
             {error && <p className="error-message">{error}</p>}
 
             <table className="data-table">
-                {/* ... (Table content remains the same) ... */}
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -140,7 +168,13 @@ const Products: React.FC = () => {
                             <td>{p.currentSellingPrice?.toLocaleString('en-RW') || 0} RWF</td>
                             <td>{p.unitOfMeasure}</td>
                             <td>
-                                <button className="btn-edit">Edit</button>
+                                {/* FIXED: Added onClick handler */}
+                                <button 
+                                    className="btn-edit" 
+                                    onClick={() => handleEdit(p)}
+                                >
+                                    Edit
+                                </button>
                                 {isBoss && ( 
                                     <button 
                                         className="btn-delete" 
@@ -159,8 +193,9 @@ const Products: React.FC = () => {
             {showModal && (
                 <div className="modal-backdrop">
                     <div className="modal-content">
-                        <h3>Create New Product</h3>
-                        <form onSubmit={handleCreateProduct}>
+                        {/* DYNAMIC TITLE */}
+                        <h3>{editingProduct ? 'Edit Product' : 'Create New Product'}</h3>
+                        <form onSubmit={handleSubmitProduct}>
                             
                             <div className="form-group">
                                 <label>Category</label>
@@ -174,29 +209,50 @@ const Products: React.FC = () => {
 
                             <div className="form-group">
                                 <label>Product Name</label>
-                                <input type="text" name="name" value={formData.name} onChange={handleFormChange} required />
+                                <input 
+                                    type="text" 
+                                    name="name" 
+                                    value={formData.name} 
+                                    onChange={handleFormChange} 
+                                    required 
+                                />
                             </div>
 
                             <div className="form-group">
                                 <label>Unit of Measure (e.g., kg, sack)</label>
-                                <input type="text" name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleFormChange} required />
+                                <input 
+                                    type="text" 
+                                    name="unitOfMeasure" 
+                                    value={formData.unitOfMeasure} 
+                                    onChange={handleFormChange} 
+                                    required 
+                                />
                             </div>
                             
                             <div className="form-group">
                                 <label>Description</label>
-                                <textarea name="description" value={formData.description} onChange={handleFormChange} rows={3}></textarea>
+                                <textarea 
+                                    name="description" 
+                                    value={formData.description} 
+                                    onChange={handleFormChange} 
+                                    rows={3}
+                                ></textarea>
                             </div>
 
                             <div className="modal-actions">
-                                <button type="submit" className="btn-primary">Create Product</button>
-                                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                                <button type="submit" className="btn-primary">
+                                    {editingProduct ? 'Update Product' : 'Create Product'}
+                                </button>
+                                <button type="button" className="btn-secondary" onClick={handleCloseModal}>
+                                    Cancel
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* --- NEW: Category Creation Modal --- */}
+            {/* --- Category Creation Modal --- */}
             {showCategoryModal && (
                 <div className="modal-backdrop">
                     <div className="modal-content">
@@ -204,11 +260,18 @@ const Products: React.FC = () => {
                         <form onSubmit={handleCreateCategory}>
                             <div className="form-group">
                                 <label>Category Name</label>
-                                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} required />
+                                <input 
+                                    type="text" 
+                                    value={newCategoryName} 
+                                    onChange={(e) => setNewCategoryName(e.target.value)} 
+                                    required 
+                                />
                             </div>
                             <div className="modal-actions">
                                 <button type="submit" className="btn-primary">Create Category</button>
-                                <button type="button" className="btn-secondary" onClick={() => setShowCategoryModal(false)}>Cancel</button>
+                                <button type="button" className="btn-secondary" onClick={() => setShowCategoryModal(false)}>
+                                    Cancel
+                                </button>
                             </div>
                         </form>
                     </div>

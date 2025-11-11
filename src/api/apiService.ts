@@ -1,18 +1,18 @@
 // src/api/apiService.ts
 import axios, { AxiosResponse } from 'axios';
-// --- FIX: Import the missing types here ---
-import { User,
-     Product, 
-     ProductCategory,
-     ProductFormData,
-     Order,
-     OrderFormData, 
-     ExpenseRecord, 
-     DashboardMetrics, 
-     PurchaseOrder, 
-     Supplier } from '../types/models';
-// Use environment variable for the base URL
-// Note: This access method is specific to your build tool (like Vite)
+import { 
+    User,
+    Product, 
+    ProductCategory,
+    ProductFormData,
+    Order,
+    OrderFormData, 
+    ExpenseRecord, 
+    DashboardMetrics, 
+    PurchaseOrder, 
+    Supplier 
+} from '../types/models';
+
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 if (!API_URL) {
@@ -53,31 +53,35 @@ export const logout = () => {
     localStorage.removeItem('user');
 };
 
+// --- PRODUCT API Functions ---
 export const getProducts = (): Promise<AxiosResponse<Product[]>> => api.get('/products');
 export const deleteProduct = (id: string): Promise<AxiosResponse<any>> => api.delete(`/products/${id}`);
 export const getProductCategories = (): Promise<AxiosResponse<ProductCategory[]>> => api.get('/products/categories');
 export const createProduct = (productData: ProductFormData): Promise<AxiosResponse<Product>> => api.post('/products', productData);
 export const createProductCategory = (data: {name: string}): Promise<AxiosResponse<ProductCategory>> => api.post('/products/categories', data);
+
+// ADD THIS MISSING FUNCTION:
+export const updateProduct = (id: string, productData: ProductFormData): Promise<AxiosResponse<Product>> => 
+    api.put(`/products/${id}`, productData);
+
+// --- ORDER API Functions ---
 export const getOrders = (): Promise<AxiosResponse<Order[]>> => api.get('/orders');
 export const createOrder = (orderData: OrderFormData): Promise<AxiosResponse<Order>> => api.post('/orders', orderData);
 
-// --- EXPENSE API Functions (Required for Expenses.tsx) ---
+// --- EXPENSE API Functions ---
 export const getExpenseRecords = (): Promise<AxiosResponse<ExpenseRecord[]>> => api.get('/expenses/records');
 export const createExpenseRecord = (data: any): Promise<AxiosResponse<any>> => api.post('/expenses/records', data);
 export const getExpenseTypes = (): Promise<AxiosResponse<ProductCategory[]>> => api.get('/expenses/types');
 export const createExpenseType = (data: {name: string}): Promise<AxiosResponse<any>> => api.post('/expenses/types', data);
 
-// --- PO API Functions (Required for PurchaseOrders.tsx) ---
+// --- PO API Functions ---
 export const getPOs = (): Promise<AxiosResponse<PurchaseOrder[]>> => api.get('/po');
 export const getSuppliers = (): Promise<AxiosResponse<Supplier[]>> => api.get('/po/suppliers');
 export const createSupplier = (data: {name: string}): Promise<AxiosResponse<Supplier>> => api.post('/po/suppliers', data);
 export const receivePO = (id: string): Promise<AxiosResponse<any>> => api.put(`/po/${id}/receive`);
-export const createPO = (poData: any): Promise<AxiosResponse<PurchaseOrder>> => api.post('/po', poData); 
+export const createPO = (poData: any): Promise<AxiosResponse<PurchaseOrder>> => api.post('/po', poData);
 
-
-
-// --- REPORT API Functions (Required for DashboardBoss.tsx) ---
-export const getDashboardMetrics = (): Promise<AxiosResponse<DashboardMetrics>> => api.get('/reports/dashboard'); // <-- This was missing
-
+// --- REPORT API Functions ---
+export const getDashboardMetrics = (): Promise<AxiosResponse<DashboardMetrics>> => api.get('/reports/dashboard');
 
 export default api;

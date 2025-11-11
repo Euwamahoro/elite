@@ -1,11 +1,11 @@
 /* src/styles/Global.css */
 
 :root {
-    --primary-color: #4361ee; /* Vibrant blue */
-    --secondary-color: #3a86ff; /* Lighter blue */
-    --accent-color: #7209b7; /* Purple accent */
+    --primary-color: #f8fafc; /* Vibrant blue */
+    --secondary-color: #30363e; /* Lighter blue */
+    --accent-color: #30363e; /* Purple accent */
     --success-color: #4cc9f0; /* Cyan for success */
-    --warning-color: #f72585; /* Pink for warnings */
+    --warning-color: #30363e; /* Pink for warnings */
     --background-light: #f8fafc; /* Very light gray */
     --background-card: #ffffff; /* White for cards */
     --sidebar-bg: #1e293b; /* Dark blue-gray sidebar */
@@ -513,19 +513,19 @@ body {
     background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
 }
 .card-metric.secondary {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    background: linear-gradient(135deg, #a29daa, #7c3aed);
 }
 .card-metric.success {
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: linear-gradient(135deg, #a9beb7, #059669);
 }
 .card-metric.danger {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
+    background: linear-gradient(135deg, #c3b3b3, #dc2626);
 }
 .card-metric.warning {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    background: linear-gradient(135deg, #ecece7, #d97706);
 }
 .card-metric.info {
-    background: linear-gradient(135deg, #06b6d4, #0891b2);
+    background: linear-gradient(135deg, #f6fafa, #0891b2);
 }
 
 /* ====================================
