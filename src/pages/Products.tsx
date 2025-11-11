@@ -61,8 +61,8 @@ const Products: React.FC = () => {
         setFormData({
             category: product.category._id,
             name: product.name,
-            description: product.description || '',
-            unitOfMeasure: product.unitOfMeasure,
+            description: (product as any).description || '',
+            unitOfMeasure: product.unitOfMeasure
         });
         setShowModal(true);
     };
