@@ -1,39 +1,37 @@
-// src/App.tsx
+// src/App.tsx - UPDATED (Components handle their own Layout)
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Products from './pages/Products'; 
 import Orders from './pages/Orders'; 
-import Expenses from './pages/Expenses'; // <-- FINAL IMPORT
-import PurchaseOrders from './pages/PurchaseOrders'; // <-- FINAL IMPORT
+import Expenses from './pages/Expenses';
+import PurchaseOrders from './pages/PurchaseOrders';
+import Suppliers from './pages/Supplier';
 import { useAppSelector } from './store/hooks';
 import { selectIsAuthenticated, selectIsBoss } from './store/authSlice';
 import DashboardBoss from './pages/DashboardBoss'; 
 import DashboardManager from './pages/DashboardManager'; 
-import Layout from './components/Layout'; 
 
-// --- Private Route Component ---
-interface PrivateRouteProps {
-    allowedRoles: ('Boss' | 'Manager')[];
-}
-
-const PrivateRoute: React.FC<PrivateRouteProps> = ({ allowedRoles }) => {
+// Simple auth check without Layout
+const ProtectedRoute = ({ children, allowedRoles }: { 
+    children: React.ReactNode, 
+    allowedRoles: ('Boss' | 'Manager')[] 
+}) => {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
     const isBoss = useAppSelector(selectIsBoss);
-    const userRole = isBoss ? 'Boss' : 'Manager'; // Simplified role string
+    const userRole = isBoss ? 'Boss' : 'Manager';
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
     
-    if (allowedRoles.includes(userRole)) {
-        return <Outlet />; // Render child routes/elements
+    if (!allowedRoles.includes(userRole)) {
+        // Return just the error without Layout since your components handle Layout
+        return <p style={{color: 'red', padding: '20px'}}>Error 403: You do not have permission to view this page.</p>;
     }
     
-    // Fallback/Forbidden page
-    return <Layout pageTitle="Access Denied"><p style={{color: 'red'}}>Error 403: You do not have permission to view this page.</p></Layout>; 
+    return <>{children}</>;
 };
-
 
 const App: React.FC = () => {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -47,33 +45,76 @@ const App: React.FC = () => {
                 {/* Public Route */}
                 <Route path="/login" element={<Login />} />
                 
-                {/* Redirect authenticated users from / to their dashboard */}
-                <Route path="/" element={isAuthenticated ? <Navigate to={defaultDashboard} replace /> : <Navigate to="/login" replace />} />
+                {/* Redirect */}
+                <Route path="/" element={
+                    isAuthenticated ? 
+                    <Navigate to={defaultDashboard} replace /> : 
+                    <Navigate to="/login" replace />
+                } />
 
-                {/* --- Protected Routes (Boss and Manager Access) --- */}
-                <Route element={<PrivateRoute allowedRoles={['Boss', 'Manager']} />}>
-                    {/* General Access Routes */}
-                    <Route path="/products" element={<Products />} />
-                    <Route path="/orders" element={<Orders />} /> 
-                    <Route path="/expenses" element={<Expenses />} /> {/* <-- FINAL ROUTE */}
-                    <Route path="/po" element={<PurchaseOrders />} /> {/* <-- FINAL ROUTE */}
-                </Route>
-
-                {/* --- Role-Specific Protected Routes --- */}
+                {/* --- Individual Protected Routes --- */}
+                {/* NO LAYOUT WRAPPER - Components handle Layout themselves */}
                 
-                {/* Boss ONLY Routes */}
-                <Route element={<PrivateRoute allowedRoles={['Boss']} />}>
-                    <Route path="/dashboard/boss" element={<DashboardBoss />} />
-                    <Route path="/users" element={<Layout pageTitle="User Management"><div>User Management Page</div></Layout>} />
-                </Route>
+                {/* Dashboard Routes */}
+                <Route path="/dashboard/boss" element={
+                    <ProtectedRoute allowedRoles={['Boss']}>
+                        <DashboardBoss />
+                    </ProtectedRoute>
+                } />
                 
-                {/* Manager ONLY Routes (Dashboard is primary Manager view) */}
-                <Route element={<PrivateRoute allowedRoles={['Manager']} />}>
-                    <Route path="/dashboard/manager" element={<DashboardManager />} />
-                </Route>
+                <Route path="/dashboard/manager" element={
+                    <ProtectedRoute allowedRoles={['Manager']}>
+                        <DashboardManager />
+                    </ProtectedRoute>
+                } />
+                
+                {/* Other Routes */}
+                <Route path="/products" element={
+                    <ProtectedRoute allowedRoles={['Boss', 'Manager']}>
+                        <Products />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/orders" element={
+                    <ProtectedRoute allowedRoles={['Boss', 'Manager']}>
+                        <Orders />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/expenses" element={
+                    <ProtectedRoute allowedRoles={['Boss', 'Manager']}>
+                        <Expenses />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/po" element={
+                    <ProtectedRoute allowedRoles={['Boss', 'Manager']}>
+                        <PurchaseOrders />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/suppliers" element={
+                    <ProtectedRoute allowedRoles={['Boss', 'Manager']}>
+                        <Suppliers />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/users" element={
+                    <ProtectedRoute allowedRoles={['Boss']}>
+                        {/* User Management Page - Add Layout if this component doesn't have it */}
+                        <div style={{ padding: '20px' }}>
+                            <h1>User Management Page</h1>
+                            <p>This page would need Layout wrapper if you create a component</p>
+                        </div>
+                    </ProtectedRoute>
+                } />
 
-                {/* 404 Fallback */}
-                <Route path="*" element={<Layout pageTitle="Not Found"><div>404: Page Not Found</div></Layout>} />
+                {/* 404 - Just simple error since no Layout */}
+                <Route path="*" element={
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <h1>404: Page Not Found</h1>
+                    </div>
+                } />
             </Routes>
         </Router>
     );
