@@ -59,19 +59,24 @@ export interface Product {
     unitOfMeasure: string;
     stockLayers: StockLot[];
     minStockLevel: number;
-    totalStock: number;          // Virtual property
-    currentSellingPrice: number; // Virtual property
-    isLowStock: boolean;         // Virtual property
+    // UPDATED: Added real sellingPrice field from backend
+    sellingPrice: number; 
+    totalStock: number;          
+    currentSellingPrice: number; 
+    isLowStock: boolean;         
 }
+
 
 // --- Product Form Data ---
 export interface ProductFormData {
-    category: string; // The category ID
+    category: string; 
     name: string;
     description: string;
     unitOfMeasure: string;
     minStockLevel?: number;
     productCode?: string;
+    // UPDATED: Added sellingPrice to form
+    sellingPrice: number; 
 }
 
 // --- Order Entities ---

@@ -1,4 +1,4 @@
-// src/pages/Products.tsx - COMPLETE UPDATED VERSION
+// src/pages/Products.tsx
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { 
@@ -137,7 +137,6 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                     <th>Batch Number</th>
                                     <th>Quantity</th>
                                     <th>Unit Cost</th>
-                                    <th>Selling Price</th>
                                     <th>Date Acquired</th>
                                     <th>Expiry Date</th>
                                     <th>Days Left</th>
@@ -164,7 +163,6 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                                 {batch.quantity}
                                             </td>
                                             <td>{batch.unitCost?.toLocaleString('en-RW')} RWF</td>
-                                            <td>{batch.unitPrice?.toLocaleString('en-RW')} RWF</td>
                                             <td>{formatDate(batch.dateAcquired)}</td>
                                             <td>
                                                 {batch.expiryDate ? formatDate(batch.expiryDate) : 'N/A'}
@@ -229,17 +227,8 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                         required
                                     />
                                 </div>
-                                <div className="form-group">
-                                    <label>Selling Price (RWF) - Optional</label>
-                                    <input 
-                                        type="number"
-                                        value={stockForm.unitPrice || ''}
-                                        onChange={(e) => setStockForm({...stockForm, unitPrice: parseFloat(e.target.value) || undefined})}
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="Auto-calculated (30% markup) if empty"
-                                    />
-                                </div>
+                                {/* NOTE: Removed Unit Price (Selling Price) from Stock Lot as it's now managed on Product level */}
+                                
                                 <div className="form-group">
                                     <label>Expiry Date (Optional)</label>
                                     <input 
@@ -280,7 +269,8 @@ const initialFormData: ProductFormData = {
     name: '',
     description: '',
     unitOfMeasure: '',
-    minStockLevel: 0
+    minStockLevel: 0,
+    sellingPrice: 0 // Added default selling price
 };
 
 const Products: React.FC = () => {
@@ -331,7 +321,7 @@ const Products: React.FC = () => {
     // --- Edit Product Handler ---
     const handleEdit = async (product: Product) => {
         try {
-            // Fetch the full product details to get minStockLevel
+            // Fetch the full product details to get minStockLevel and sellingPrice
             const response = await getProductById(product._id);
             const fullProduct = response.data;
             
@@ -342,7 +332,8 @@ const Products: React.FC = () => {
                 description: fullProduct.description || '',
                 unitOfMeasure: fullProduct.unitOfMeasure,
                 minStockLevel: fullProduct.minStockLevel || 0,
-                productCode: fullProduct.productCode || ''
+                productCode: fullProduct.productCode || '',
+                sellingPrice: fullProduct.sellingPrice || 0 // Load selling price
             });
             setShowModal(true);
         } catch (error: any) {
@@ -396,7 +387,7 @@ const Products: React.FC = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // --- Updated: Handle both Create and Update ---
+    // --- Handle both Create and Update ---
     const handleSubmitProduct = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -423,14 +414,12 @@ const Products: React.FC = () => {
         }
     };
 
-    // --- Reset form when modal closes ---
     const handleCloseModal = () => {
         setShowModal(false);
         setFormData(initialFormData);
         setEditingProduct(null);
     };
 
-    // --- Get stock status class ---
     const getStockStatusClass = (product: Product) => {
         if (product.totalStock === 0) return 'stock-out';
         if (product.isLowStock) return 'stock-low';
@@ -470,7 +459,7 @@ const Products: React.FC = () => {
                         <th>Code</th>
                         <th>Category</th>
                         <th>Total Stock</th>
-                        <th>Current Price</th>
+                        <th>Selling Price</th> {/* Updated Header */}
                         <th>UoM</th>
                         <th>Min Stock</th>
                         <th>Status</th>
@@ -505,7 +494,8 @@ const Products: React.FC = () => {
                                     </div>
                                 )}
                             </td>
-                            <td>{product.currentSellingPrice?.toLocaleString('en-RW') || 0} RWF</td>
+                            {/* Display Master Selling Price */}
+                            <td>{product.sellingPrice?.toLocaleString('en-RW') || 0} RWF</td>
                             <td>{product.unitOfMeasure}</td>
                             <td>{product.minStockLevel || 0}</td>
                             <td>
@@ -552,7 +542,6 @@ const Products: React.FC = () => {
             {showModal && (
                 <div className="modal-backdrop">
                     <div className="modal-content">
-                        {/* DYNAMIC TITLE */}
                         <h3>{editingProduct ? 'Edit Product' : 'Create New Product'}</h3>
                         <form onSubmit={handleSubmitProduct}>
                             
@@ -575,6 +564,21 @@ const Products: React.FC = () => {
                                     onChange={handleFormChange} 
                                     required 
                                 />
+                            </div>
+
+                            {/* NEW: Selling Price Input */}
+                            <div className="form-group">
+                                <label>Standard Selling Price (RWF) *</label>
+                                <input 
+                                    type="number" 
+                                    name="sellingPrice" 
+                                    value={formData.sellingPrice || ''} 
+                                    onChange={handleFormChange}
+                                    min="0"
+                                    required
+                                    placeholder="e.g. 500"
+                                />
+                                <small style={{color: '#666'}}>This price will be used when selling items from any batch.</small>
                             </div>
 
                             <div className="form-group">

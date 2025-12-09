@@ -1,4 +1,4 @@
-// src/pages/PurchaseOrders.tsx - FIXED VERSION
+// src/pages/PurchaseOrders.tsx
 import React, { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { 
@@ -32,7 +32,7 @@ interface POItemForm {
     product: string;
     quantity: number;
     unitCost: number;
-    unitPrice?: number;
+    // Removed unitPrice (selling price)
 }
 
 const initialPOFormData: POFormData = {
@@ -61,7 +61,7 @@ const PurchaseOrders: React.FC = () => {
     const [itemProduct, setItemProduct] = useState('');
     const [itemQuantity, setItemQuantity] = useState(1);
     const [itemCost, setItemCost] = useState(0);
-    const [itemSellingPrice, setItemSellingPrice] = useState<number | null>(null);
+    // Removed itemSellingPrice state
 
     // Receive states
     const [receiveNotes, setReceiveNotes] = useState('');
@@ -88,11 +88,9 @@ const PurchaseOrders: React.FC = () => {
                 getPODashboardStats()
             ]);
             
-            // FIX: Handle different response structures
             setPos(poRes.data.pos || poRes.data || []);
             
-            // CRITICAL FIX: Handle supplier response properly
-            // The API might return { success: true, suppliers: [] } or just []
+            // Handle different supplier response structures
             const supplierData: any = supplierRes.data;
             if (supplierData && Array.isArray(supplierData)) {
                 setSuppliers(supplierData);
@@ -110,7 +108,6 @@ const PurchaseOrders: React.FC = () => {
         } catch (error: any) {
             console.error('Fetch error:', error);
             setError(error.response?.data?.message || 'Failed to fetch initial data.');
-            // Initialize empty arrays to prevent map errors
             setSuppliers([]);
             setAvailableProducts([]);
             setPos([]);
@@ -130,15 +127,10 @@ const PurchaseOrders: React.FC = () => {
             return;
         }
         
-        // IMPORTANT: Selling price should be manually input based on manufacturing cost
-        // User can either provide it or we use cost price as default
-        const sellingPrice = itemSellingPrice || itemCost;
-        
         const newItem: POItemForm = {
             product: itemProduct,
             quantity: itemQuantity,
             unitCost: itemCost,
-            unitPrice: sellingPrice,
         };
 
         setPoFormData(prev => ({
@@ -149,7 +141,6 @@ const PurchaseOrders: React.FC = () => {
         setItemProduct('');
         setItemQuantity(1);
         setItemCost(0);
-        setItemSellingPrice(null);
     };
 
     // --- Core PO Submission Logic ---
@@ -169,7 +160,6 @@ const PurchaseOrders: React.FC = () => {
             sum + (item.quantity * item.unitCost), 0
         );
         
-        // For now, send 0 for other fields (they'll be calculated by backend)
         const payload = {
             supplier: poFormData.supplier,
             paymentTerms: poFormData.paymentTerms || 'Credit 30 days',
@@ -178,18 +168,16 @@ const PurchaseOrders: React.FC = () => {
                 name: '', // Backend will fill this
                 quantity: item.quantity,
                 unitCost: item.unitCost,
-                unitPrice: item.unitPrice || item.unitCost,
-                subtotal: item.quantity * item.unitCost // IMPORTANT: Include subtotal
+                // No unitPrice here, strictly cost
+                subtotal: item.quantity * item.unitCost
             })),
             totalCost: itemsTotal,
-            grandTotal: itemsTotal, // Send calculated total
+            grandTotal: itemsTotal,
             taxAmount: 0,
             shippingCost: 0,
             discount: 0
         };
 
-        console.log("Sending PO payload:", payload);
-        
         const response = await createPO(payload);
         
         setSuccess(`Purchase Order ${response.data.poNumber} created successfully as Draft!`);
@@ -201,7 +189,6 @@ const PurchaseOrders: React.FC = () => {
         
     } catch (error: any) {
         console.error("PO Creation Failed:", error);
-        console.error("Error response:", error.response?.data);
         setError(error.response?.data?.message || 'Failed to create Purchase Order.');
     }
 };
@@ -209,7 +196,6 @@ const PurchaseOrders: React.FC = () => {
     // --- PO Workflow Actions ---
     const handleSubmitPO = async (id: string) => {
         if (!window.confirm('Submit this PO for approval?')) return;
-        
         try {
             await submitPO(id);
             setSuccess('PO submitted for approval successfully!');
@@ -221,7 +207,6 @@ const PurchaseOrders: React.FC = () => {
 
     const handleApprovePO = async (id: string) => {
         if (!window.confirm('Approve this PO? This will check credit limits.')) return;
-        
         try {
             await approvePO(id);
             setSuccess('PO approved successfully!');
@@ -233,7 +218,6 @@ const PurchaseOrders: React.FC = () => {
 
     const handleMarkAsOrdered = async (id: string) => {
         if (!window.confirm('Mark this PO as Ordered?')) return;
-        
         try {
             await markAsOrdered(id);
             setSuccess('PO marked as Ordered!');
@@ -248,7 +232,6 @@ const PurchaseOrders: React.FC = () => {
             setError('Please provide a cancellation reason.');
             return;
         }
-
         if (!window.confirm(`Cancel PO ${selectedPO.poNumber}? This action cannot be undone.`)) return;
         
         try {
@@ -267,22 +250,17 @@ const PurchaseOrders: React.FC = () => {
     const handleOpenReceiveModal = async (po: PurchaseOrder) => {
         setSelectedPO(po);
         setReceiveNotes('');
-        
-        // Initialize received items array with remaining quantities
         const items: POReceiveItem[] = po.poItems.map((item: any) => ({
             poItemId: item._id,
             quantity: item.quantity - (item.quantityReceived || 0),
             notes: ''
         }));
-        
         setReceivedItems(items);
         setShowReceiveModal(true);
     };
 
     const handleReceivePO = async () => {
         if (!selectedPO) return;
-        
-        // Filter items with quantity > 0
         const itemsToReceive = receivedItems.filter(item => item.quantity > 0);
         
         if (itemsToReceive.length === 0) {
@@ -296,12 +274,11 @@ const PurchaseOrders: React.FC = () => {
 
         try {
             await receivePO(selectedPO._id, itemsToReceive, receiveNotes);
-            setSuccess(`Items received from PO ${selectedPO.poNumber} successfully! Batch numbers generated.`);
+            setSuccess(`Items received from PO ${selectedPO.poNumber} successfully!`);
             setShowReceiveModal(false);
             fetchAllData();
         } catch (error: any) {
             setError(error.response?.data?.message || 'Failed to receive items.');
-            console.error("Receive PO Failed:", error);
         }
     };
 
@@ -320,12 +297,10 @@ const PurchaseOrders: React.FC = () => {
             setError('Please enter a valid payment amount.');
             return;
         }
-
         if (paymentData.amount > (selectedPO.balanceDue || 0)) {
             setError(`Payment amount cannot exceed balance due: ${selectedPO.balanceDue}`);
             return;
         }
-
         try {
             await addPayment(selectedPO._id, paymentData);
             setSuccess(`Payment of ${paymentData.amount} recorded for PO ${selectedPO.poNumber}`);
@@ -380,24 +355,12 @@ const PurchaseOrders: React.FC = () => {
         return 'status-pending';
     };
 
-    const canSubmit = (po: PurchaseOrder) => 
-        po.status === 'Draft' && po.managerId === user?._id;
-    
-    const canApprove = (po: PurchaseOrder) => 
-        po.status === 'Submitted' && isBoss;
-    
-    const canOrder = (po: PurchaseOrder) => 
-        po.status === 'Approved';
-    
-    const canReceive = (po: PurchaseOrder) => 
-        ['Ordered', 'Partially Received'].includes(po.status);
-    
-    const canPay = (po: PurchaseOrder) => 
-        po.paymentStatus !== 'Paid' && po.balanceDue > 0;
-    
-    const canCancel = (po: PurchaseOrder) => 
-        ['Draft', 'Submitted', 'Approved', 'Ordered'].includes(po.status) && 
-        (isBoss || po.managerId === user?._id);
+    const canSubmit = (po: PurchaseOrder) => po.status === 'Draft' && po.managerId === user?._id;
+    const canApprove = (po: PurchaseOrder) => po.status === 'Submitted' && isBoss;
+    const canOrder = (po: PurchaseOrder) => po.status === 'Approved';
+    const canReceive = (po: PurchaseOrder) => ['Ordered', 'Partially Received'].includes(po.status);
+    const canPay = (po: PurchaseOrder) => po.paymentStatus !== 'Paid' && po.balanceDue > 0;
+    const canCancel = (po: PurchaseOrder) => ['Draft', 'Submitted', 'Approved', 'Ordered'].includes(po.status) && (isBoss || po.managerId === user?._id);
 
     if (loading) return <Layout pageTitle="Purchase Orders"><div>Loading POs...</div></Layout>;
 
@@ -473,66 +436,13 @@ const PurchaseOrders: React.FC = () => {
                             <td>{new Date(po.createdAt).toLocaleDateString()}</td>
                             <td>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                    <button 
-                                        className="btn-info btn-small"
-                                        onClick={() => handleViewPODetails(po._id)}
-                                    >
-                                        View
-                                    </button>
-                                    
-                                    {canSubmit(po) && (
-                                        <button 
-                                            className="btn-secondary btn-small"
-                                            onClick={() => handleSubmitPO(po._id)}
-                                        >
-                                            Submit
-                                        </button>
-                                    )}
-                                    
-                                    {canApprove(po) && (
-                                        <button 
-                                            className="btn-success btn-small"
-                                            onClick={() => handleApprovePO(po._id)}
-                                        >
-                                            Approve
-                                        </button>
-                                    )}
-                                    
-                                    {canOrder(po) && (
-                                        <button 
-                                            className="btn-primary btn-small"
-                                            onClick={() => handleMarkAsOrdered(po._id)}
-                                        >
-                                            Order
-                                        </button>
-                                    )}
-                                    
-                                    {canReceive(po) && (
-                                        <button 
-                                            className="btn-warning btn-small"
-                                            onClick={() => handleOpenReceiveModal(po)}
-                                        >
-                                            Receive
-                                        </button>
-                                    )}
-                                    
-                                    {canPay(po) && (
-                                        <button 
-                                            className="btn-success btn-small"
-                                            onClick={() => handleOpenPaymentModal(po)}
-                                        >
-                                            Pay
-                                        </button>
-                                    )}
-                                    
-                                    {canCancel(po) && (
-                                        <button 
-                                            className="btn-delete btn-small"
-                                            onClick={() => {setSelectedPO(po); setShowCancelModal(true);}}
-                                        >
-                                            Cancel
-                                        </button>
-                                    )}
+                                    <button className="btn-info btn-small" onClick={() => handleViewPODetails(po._id)}>View</button>
+                                    {canSubmit(po) && <button className="btn-secondary btn-small" onClick={() => handleSubmitPO(po._id)}>Submit</button>}
+                                    {canApprove(po) && <button className="btn-success btn-small" onClick={() => handleApprovePO(po._id)}>Approve</button>}
+                                    {canOrder(po) && <button className="btn-primary btn-small" onClick={() => handleMarkAsOrdered(po._id)}>Order</button>}
+                                    {canReceive(po) && <button className="btn-warning btn-small" onClick={() => handleOpenReceiveModal(po)}>Receive</button>}
+                                    {canPay(po) && <button className="btn-success btn-small" onClick={() => handleOpenPaymentModal(po)}>Pay</button>}
+                                    {canCancel(po) && <button className="btn-delete btn-small" onClick={() => {setSelectedPO(po); setShowCancelModal(true);}}>Cancel</button>}
                                 </div>
                             </td>
                         </tr>
@@ -564,11 +474,6 @@ const PurchaseOrders: React.FC = () => {
                                         </option>
                                     ))}
                                 </select>
-                                {!Array.isArray(suppliers) && (
-                                    <p className="error-message" style={{ marginTop: '5px' }}>
-                                        Unable to load suppliers. Please refresh the page.
-                                    </p>
-                                )}
                             </div>
 
                             {/* 2. PAYMENT TERMS */}
@@ -587,14 +492,14 @@ const PurchaseOrders: React.FC = () => {
                                 </select>
                             </div>
 
-                            {/* 3. ITEM SELECTION (Dynamic) */}
+                            {/* 3. ITEM SELECTION */}
                             <fieldset className="fieldset-items">
                                 <legend>Add Items *</legend>
                                 <div className="item-input-group">
                                     <select 
                                         value={itemProduct} 
                                         onChange={(e) => setItemProduct(e.target.value)}
-                                        style={{ width: '30%' }}
+                                        style={{ width: '45%' }}
                                     >
                                         <option value="">-- Product --</option>
                                         {Array.isArray(availableProducts) && availableProducts.map(p => (
@@ -612,28 +517,19 @@ const PurchaseOrders: React.FC = () => {
                                         min="1"
                                     />
                                     <input 
-                                        type="text" 
-                                        placeholder="Unit Cost" 
+                                        type="number" 
+                                        placeholder="Unit Cost (Buying Price)" 
                                         value={itemCost} 
                                         onChange={(e) => setItemCost(Math.max(0, parseFloat(e.target.value) || 0))} 
-                                        style={{ width: '15%' }}
+                                        style={{ width: '20%' }}
                                         min="0"
-                                        step="0"
-                                    />
-                                    <input 
-                                        type="number" 
-                                        placeholder="Selling Price" 
-                                        value={itemSellingPrice || ''} 
-                                        onChange={(e) => setItemSellingPrice(parseFloat(e.target.value) || null)} 
-                                        style={{ width: '15%' }}
-                                        min="0.01"
                                         step="0.01"
                                     />
                                     <button 
                                         type="button" 
                                         className="btn-success" 
                                         onClick={handleAddItem}
-                                        style={{ width: '25%' }}
+                                        style={{ width: '20%' }}
                                     >
                                         Add Item
                                     </button>
@@ -650,7 +546,6 @@ const PurchaseOrders: React.FC = () => {
                                                     <th>Product</th>
                                                     <th>Qty</th>
                                                     <th>Cost/Unit</th>
-                                                    <th>Price/Unit</th>
                                                     <th>Subtotal</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -661,13 +556,11 @@ const PurchaseOrders: React.FC = () => {
                                                         ? availableProducts.find(p => p._id === item.product)
                                                         : null;
                                                     const subtotal = item.quantity * item.unitCost;
-                                                    const sellingPrice = item.unitPrice || item.unitCost;
                                                     return (
                                                         <tr key={index}>
                                                             <td>{product?.name || 'Unknown Product'}</td>
                                                             <td>{item.quantity}</td>
                                                             <td>{item.unitCost.toLocaleString('en-RW')}</td>
-                                                            <td>{sellingPrice.toLocaleString('en-RW')}</td>
                                                             <td>{subtotal.toLocaleString('en-RW')} RWF</td>
                                                             <td>
                                                                 <button 
@@ -687,7 +580,7 @@ const PurchaseOrders: React.FC = () => {
                                             </tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td colSpan={4} style={{ textAlign: 'right', fontWeight: 'bold' }}>Total:</td>
+                                                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 'bold' }}>Total Cost:</td>
                                                     <td colSpan={2} style={{ fontWeight: 'bold' }}>
                                                         {poFormData.poItems.reduce((sum, item) => sum + item.quantity * item.unitCost, 0).toLocaleString('en-RW')} RWF
                                                     </td>
@@ -726,17 +619,11 @@ const PurchaseOrders: React.FC = () => {
                                 <p><strong>Supplier:</strong> {(selectedPO.supplier as Supplier)?.name || 'N/A'}</p>
                                 <p><strong>Manager:</strong> {selectedPO.managerName}</p>
                                 <p><strong>Status:</strong> <span className={getStatusClass(selectedPO.status)}>{selectedPO.status}</span></p>
-                                <p><strong>Created:</strong> {new Date(selectedPO.createdAt).toLocaleString()}</p>
                             </div>
                             <div>
                                 <h4>Financial Information</h4>
-                                <p><strong>Grand Total:</strong> {selectedPO.grandTotal?.toLocaleString('en-RW')} RWF</p>
-                                <p><strong>Payment Status:</strong> <span className={getPaymentStatusClass(selectedPO.paymentStatus)}>{selectedPO.paymentStatus}</span></p>
-                                <p><strong>Amount Paid:</strong> {selectedPO.amountPaid?.toLocaleString('en-RW')} RWF</p>
+                                <p><strong>Total Cost:</strong> {selectedPO.grandTotal?.toLocaleString('en-RW')} RWF</p>
                                 <p><strong>Balance Due:</strong> {selectedPO.balanceDue?.toLocaleString('en-RW')} RWF</p>
-                                {selectedPO.dueDate && (
-                                    <p><strong>Due Date:</strong> {new Date(selectedPO.dueDate).toLocaleDateString()}</p>
-                                )}
                             </div>
                         </div>
 
@@ -747,9 +634,7 @@ const PurchaseOrders: React.FC = () => {
                                     <th>Product</th>
                                     <th>Ordered</th>
                                     <th>Received</th>
-                                    <th>Remaining</th>
                                     <th>Unit Cost</th>
-                                    <th>Selling Price</th>
                                     <th>Subtotal</th>
                                     <th>Batches</th>
                                 </tr>
@@ -760,9 +645,7 @@ const PurchaseOrders: React.FC = () => {
                                         <td>{item.name}</td>
                                         <td>{item.quantity}</td>
                                         <td>{item.quantityReceived || 0}</td>
-                                        <td>{item.quantity - (item.quantityReceived || 0)}</td>
                                         <td>{item.unitCost?.toLocaleString('en-RW')}</td>
-                                        <td>{item.unitPrice?.toLocaleString('en-RW')}</td>
                                         <td>{item.subtotal?.toLocaleString('en-RW')} RWF</td>
                                         <td>
                                             {item.batchNumbers?.length > 0 ? (
@@ -818,7 +701,6 @@ const PurchaseOrders: React.FC = () => {
                                 <tr>
                                     <th>Product</th>
                                     <th>Ordered</th>
-                                    <th>Already Received</th>
                                     <th>Remaining</th>
                                     <th>Quantity to Receive</th>
                                 </tr>
@@ -831,7 +713,6 @@ const PurchaseOrders: React.FC = () => {
                                         <tr key={index}>
                                             <td>{item.name}</td>
                                             <td>{item.quantity}</td>
-                                            <td>{item.quantityReceived || 0}</td>
                                             <td>{remaining}</td>
                                             <td>
                                                 <input 
