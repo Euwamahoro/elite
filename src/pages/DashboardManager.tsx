@@ -1,3 +1,4 @@
+import { getManagerDailyReport } from '../api/apiService';
 import { useState, useEffect } from 'react';
 import { Download, FileText, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package } from 'lucide-react';
 import { ManagerDailyReport } from '../types/models';
@@ -15,23 +16,19 @@ const DashboardManager = () => {
     }, [selectedDate]);
 
     const fetchDailyReport = async () => {
-        try {
-            setLoading(true);
-            const response = await fetch(`/api/reports/daily?date=${selectedDate}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            const data = await response.json();
-            setReport(data);
-            setError(null);
-        } catch (error) {
-            setError('Failed to fetch daily report');
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+        setLoading(true);
+        // Use the service function instead of raw fetch
+        const response = await getManagerDailyReport(selectedDate);
+        setReport(response.data); // Axios returns data in .data
+        setError(null);
+    } catch (error: any) {
+        console.error('Fetch error:', error);
+        setError('Failed to fetch daily report');
+    } finally {
+        setLoading(false);
+    }
+};
 
     const exportToCSV = () => {
         if (!report) return;
