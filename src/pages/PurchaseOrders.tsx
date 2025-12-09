@@ -315,9 +315,20 @@ const PurchaseOrders: React.FC = () => {
     const handleViewPODetails = async (id: string) => {
         try {
             const response = await getPOById(id);
-            setSelectedPO(response.data);
+            // FIX: The backend returns { success: true, po: {...}, ... }
+            // We need to extract the 'po' object from the response data.
+            const data: any = response.data;
+            
+            if (data.po) {
+                setSelectedPO(data.po);
+            } else {
+                // Fallback in case the structure changes or is direct
+                setSelectedPO(data);
+            }
+            
             setShowPODetailModal(true);
         } catch (error: any) {
+            console.error("Failed to load PO details:", error);
             setError(error.response?.data?.message || 'Failed to fetch PO details.');
         }
     };

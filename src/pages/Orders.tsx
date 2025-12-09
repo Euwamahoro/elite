@@ -1,4 +1,4 @@
-// src/pages/Orders.tsx
+// src/pages/Orders.tsx - UPDATED
 import React, { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { getOrders, createOrder, getProducts } from '../api/apiService';
@@ -37,9 +37,9 @@ const Orders: React.FC = () => {
             setAvailableProducts(productsRes.data);
             setError(null);
         } catch (error: any) {
-            const backendMessage = error.response?.data?.message || 'The server crashed while fetching orders. (500)';
-            setError(backendMessage); // <-- This will now show the 500 error message
-            console.error("500 Error Data:", error.response?.data);
+            const backendMessage = error.response?.data?.message || 'Failed to fetch data.';
+            setError(backendMessage); 
+            console.error("Error Data:", error.response?.data);
         } finally {
             setLoading(false);
         }
@@ -60,17 +60,16 @@ const Orders: React.FC = () => {
             return;
         }
 
-        // Check stock availability (using virtual totalStock)
+        // Check stock availability
         if (itemQuantity > product.totalStock) {
             alert(`Insufficient stock. Available: ${product.totalStock} ${product.unitOfMeasure}.`);
             return;
         }
 
-        // Add to form data (Add the 'name' field for backend schema validation)
         const newItem = { 
             product: product._id, 
             quantity: itemQuantity,
-            name: product.name // <-- FIX: ADD THIS REQUIRED FIELD
+            name: product.name
         };
 
         setFormData(prev => ({
@@ -78,7 +77,6 @@ const Orders: React.FC = () => {
             orderItems: [...prev.orderItems, newItem]
         }));
         
-        // Clear item input fields
         setSelectedProductId('');
         setItemQuantity(1);
     };
@@ -92,22 +90,21 @@ const Orders: React.FC = () => {
 
     // --- Price Calculation Effect ---
     useEffect(() => {
-        // NOTE: Frontend only estimates price using the first layer's selling price.
-        // The *final* price is calculated by the backend using FIFO.
         let estimatedTotal = 0;
         for (const item of formData.orderItems) {
             const product = getProductDetails(item.product);
             if (product) {
-                // Use the virtual currentSellingPrice (FIFO oldest layer price)
-                estimatedTotal += item.quantity * product.currentSellingPrice;
+                // UPDATED: Use the master sellingPrice
+                const price = product.sellingPrice || 0;
+                estimatedTotal += item.quantity * price;
             }
         }
         setTotalOrderValue(estimatedTotal);
-        setFormData(prev => ({ ...prev, amountPaid: estimatedTotal })); // Default to full payment
+        // Auto-fill amount paid to total (can be edited)
+        setFormData(prev => ({ ...prev, amountPaid: estimatedTotal })); 
     }, [formData.orderItems, availableProducts]);
 
     // --- Order Submission ---
-
     const handleSubmitOrder = async (e: FormEvent) => {
         e.preventDefault();
         
@@ -117,19 +114,17 @@ const Orders: React.FC = () => {
         }
 
         try {
-            // Backend will inject managerName and perform final FIFO calculation
             await createOrder(formData);
             alert('Order created successfully and stock updated!');
             setShowModal(false);
             setFormData(initialFormData);
-            fetchOrdersAndProducts(); // Refresh lists
+            fetchOrdersAndProducts(); 
         } catch (error: any) {
-            setError(error.response?.data?.message || 'Failed to create order. Stock may be insufficient.');
+            setError(error.response?.data?.message || 'Failed to create order.');
             console.error(error);
         }
     };
 
-    // --- Helper for Display ---
     const getPaymentStatusClass = (status: string) => {
         if (status === 'Cleared') return 'status-cleared';
         if (status === 'Partial') return 'status-partial';
@@ -205,7 +200,8 @@ const Orders: React.FC = () => {
                                         <option value="">-- Select Product --</option>
                                         {availableProducts.map(p => (
                                             <option key={p._id} value={p._id} disabled={p.totalStock === 0}>
-                                                {p.name} ({p.totalStock} {p.unitOfMeasure} left @ {p.currentSellingPrice} RWF)
+                                                {/* UPDATED DISPLAY: Name - Stock - Selling Price */}
+                                                {p.name} ({p.totalStock} {p.unitOfMeasure} @ {p.sellingPrice?.toLocaleString('en-RW') || 0} RWF)
                                             </option>
                                         ))}
                                     </select>
@@ -223,8 +219,9 @@ const Orders: React.FC = () => {
                                 <div className="item-list-display">
                                     {formData.orderItems.map((item, index) => {
                                         const product = getProductDetails(item.product);
-                                        const estimatedPrice = product?.currentSellingPrice || 0;
-                                        const subtotal = item.quantity * estimatedPrice;
+                                        // UPDATED: use sellingPrice
+                                        const price = product?.sellingPrice || 0;
+                                        const subtotal = item.quantity * price;
                                         return (
                                             <div key={index} className="item-tag">
                                                 <span>{item.quantity} x {product?.name}</span>
@@ -245,12 +242,10 @@ const Orders: React.FC = () => {
                                 <label>Amount Paid</label>
                                 <input 
                                     type="text" 
-                                    // Display formatted amount (for better UX)
-                                    value={formData.amountPaid.toLocaleString('en-RW', { useGrouping: false })} 
+                                    value={formData.amountPaid}
                                     onChange={(e) => setFormData(prev => ({
                                         ...prev, 
-                                        // Parse the string input to a float for state
-                                        amountPaid: parseFloat(e.target.value.replace(/,/g, '')) || 0
+                                        amountPaid: parseFloat(e.target.value) || 0
                                     }))} 
                                     required 
                                 />
