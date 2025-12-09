@@ -148,11 +148,23 @@ export const getExpenseRecords = (): Promise<AxiosResponse<ExpenseRecord[]>> => 
 export const createExpenseRecord = (data: any): Promise<AxiosResponse<any>> => api.post('/expenses/records', data);
 export const getExpenseTypes = (): Promise<AxiosResponse<any[]>> => api.get('/expenses/types');
 export const createExpenseType = (data: {name: string, description?: string}): Promise<AxiosResponse<any>> => api.post('/expenses/types', data);
-export const addExpenseSubtype = (typeId: string, data: {subtypeName: string, description?: string}): Promise<AxiosResponse<any>> => 
+export const addExpenseSubtype = (typeId: string, data: {name: string, description?: string}): Promise<AxiosResponse<any>> => 
     api.post(`/expenses/types/${typeId}/subtypes`, data);
 export const getExpenseTypeById = (id: string): Promise<AxiosResponse<any>> => api.get(`/expenses/types/${id}`);
 export const getExpenseBreakdown = (params?: {startDate?: string, endDate?: string}): Promise<AxiosResponse<any>> => 
     api.get('/expenses/breakdown', { params });
+
+// NEW: Get expense names filtered by type and subtype
+export const getExpenseNames = (params?: {
+    expenseType?: string;
+    expenseSubtype?: string;
+}): Promise<AxiosResponse<Array<{
+    name: string;
+    type: string;
+    subtype?: string;
+    count: number;
+    lastUsed: string;
+}>>> => api.get('/expenses/names', { params });
 
 // ==================== REPORT/DASHBOARD API Functions ====================
 // Legacy dashboard (if still used)

@@ -1,12 +1,13 @@
-// src/pages/Expenses.tsx - UPDATED
-import React, { useState, useEffect, FormEvent } from 'react';
+// src/pages/Expenses.tsx - UPDATED WITH EXPENSE NAME
+import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Layout from '../components/Layout';
 import { 
     getExpenseRecords, 
     createExpenseRecord, 
     getExpenseTypes, 
     createExpenseType,
-    addExpenseSubtype 
+    addExpenseSubtype,
+    getExpenseNames
 } from '../api/apiService';
 import { ExpenseRecord, ProductCategory } from '../types/models';
 import { useAppSelector } from '../store/hooks';
@@ -14,13 +15,22 @@ import { selectUser, selectIsBoss } from '../store/authSlice';
 import '../styles/Global.css'; 
 
 interface ExpenseTypeWithSubtypes extends ProductCategory {
-    subtypes?: Array<{ name: string; description?: string }>;
+    subtypes?: Array<{ _id?: string; name: string; description?: string }>;
     hasSubtypes?: boolean;
+}
+
+interface ExpenseNameOption {
+    name: string;
+    type: string;
+    subtype?: string;
+    count: number;
+    lastUsed: string;
 }
 
 const initialExpenseFormData = {
     expenseType: '',
     expenseSubtype: '',
+    expenseName: '',
     amount: 0,
     notes: '',
 };
@@ -29,7 +39,9 @@ const Expenses: React.FC = () => {
     const [records, setRecords] = useState<ExpenseRecord[]>([]);
     const [types, setTypes] = useState<ExpenseTypeWithSubtypes[]>([]);
     const [selectedType, setSelectedType] = useState<ExpenseTypeWithSubtypes | null>(null);
-    const [subtypes, setSubtypes] = useState<Array<{ name: string }>>([]);
+    const [subtypes, setSubtypes] = useState<Array<{ _id?: string; name: string }>>([]);
+    const [expenseNames, setExpenseNames] = useState<ExpenseNameOption[]>([]);
+    const [filteredExpenseNames, setFilteredExpenseNames] = useState<ExpenseNameOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showRecordModal, setShowRecordModal] = useState(false);
@@ -40,6 +52,9 @@ const Expenses: React.FC = () => {
     const [subtypeName, setSubtypeName] = useState('');
     const [useCustomSubtype, setUseCustomSubtype] = useState(false);
     const [customSubtype, setCustomSubtype] = useState('');
+    const [useCustomExpenseName, setUseCustomExpenseName] = useState(false);
+    const [customExpenseName, setCustomExpenseName] = useState('');
+    const [showExpenseNameSuggestions, setShowExpenseNameSuggestions] = useState(false);
 
     const isBoss = useAppSelector(selectIsBoss);
     const user = useAppSelector(selectUser);
@@ -61,6 +76,23 @@ const Expenses: React.FC = () => {
         }
     };
 
+    // Fetch expense names when type or subtype changes
+    const fetchExpenseNames = async (expenseType?: string, expenseSubtype?: string) => {
+        try {
+            const params: any = {};
+            if (expenseType) params.expenseType = expenseType;
+            if (expenseSubtype) params.expenseSubtype = expenseSubtype;
+            
+            const response = await getExpenseNames(params);
+            setExpenseNames(response.data);
+            setFilteredExpenseNames(response.data);
+        } catch (error: any) {
+            console.error('Failed to fetch expense names:', error);
+            setExpenseNames([]);
+            setFilteredExpenseNames([]);
+        }
+    };
+
     useEffect(() => {
         fetchExpenses();
     }, []);
@@ -71,21 +103,66 @@ const Expenses: React.FC = () => {
             const type = types.find(t => t._id === recordFormData.expenseType);
             setSelectedType(type || null);
             setSubtypes(type?.subtypes || []);
-            // Reset subtype when type changes
-            setRecordFormData(prev => ({ ...prev, expenseSubtype: '' }));
+            // Reset subtype and expense name when type changes
+            setRecordFormData(prev => ({ 
+                ...prev, 
+                expenseSubtype: '',
+                expenseName: ''
+            }));
             setUseCustomSubtype(false);
             setCustomSubtype('');
+            setUseCustomExpenseName(false);
+            setCustomExpenseName('');
+            
+            // Fetch expense names for this type
+            fetchExpenseNames(recordFormData.expenseType);
         }
     }, [recordFormData.expenseType, types]);
+
+    // Fetch expense names when subtype changes
+    useEffect(() => {
+        if (recordFormData.expenseType && recordFormData.expenseSubtype && !useCustomSubtype) {
+            // expenseSubtype is now the ID, use it directly
+            fetchExpenseNames(recordFormData.expenseType, recordFormData.expenseSubtype);
+            // Reset expense name when subtype changes
+            setRecordFormData(prev => ({ ...prev, expenseName: '' }));
+            setUseCustomExpenseName(false);
+            setCustomExpenseName('');
+        }
+    }, [recordFormData.expenseSubtype, recordFormData.expenseType, useCustomSubtype]);
+
+    // Filter expense names based on input
+    const handleExpenseNameInput = (e: ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setRecordFormData({ ...recordFormData, expenseName: value });
+        
+        if (value.trim()) {
+            const filtered = expenseNames.filter(en => 
+                en.name.toLowerCase().includes(value.toLowerCase())
+            );
+            setFilteredExpenseNames(filtered);
+            setShowExpenseNameSuggestions(true);
+        } else {
+            setFilteredExpenseNames(expenseNames);
+            setShowExpenseNameSuggestions(false);
+        }
+    };
+
+    const selectExpenseName = (name: string) => {
+        setRecordFormData({ ...recordFormData, expenseName: name });
+        setShowExpenseNameSuggestions(false);
+    };
 
     const handleRecordSubmit = async (e: FormEvent) => {
         e.preventDefault();
         try {
             const subtypeToUse = useCustomSubtype ? customSubtype : recordFormData.expenseSubtype;
+            const expenseNameToUse = useCustomExpenseName ? customExpenseName : recordFormData.expenseName;
             
             await createExpenseRecord({
                 ...recordFormData,
                 expenseSubtype: subtypeToUse,
+                expenseName: expenseNameToUse,
                 amount: parseFloat(recordFormData.amount.toString()),
             });
             
@@ -94,6 +171,8 @@ const Expenses: React.FC = () => {
             setRecordFormData(initialExpenseFormData);
             setUseCustomSubtype(false);
             setCustomSubtype('');
+            setUseCustomExpenseName(false);
+            setCustomExpenseName('');
             fetchExpenses();
         } catch (error: any) {
             setError(error.response?.data?.message || 'Failed to record expense.');
@@ -118,7 +197,7 @@ const Expenses: React.FC = () => {
         if (!selectedType || !subtypeName.trim()) return;
         
         try {
-            await addExpenseSubtype(selectedType._id, { subtypeName });
+            await addExpenseSubtype(selectedType._id, { name: subtypeName });
             alert('Subtype added successfully!');
             setShowSubtypeModal(false);
             setSubtypeName('');
@@ -148,6 +227,7 @@ const Expenses: React.FC = () => {
                         <th>Date</th>
                         <th>Type</th>
                         <th>Subtype</th>
+                        <th>Expense Name</th>
                         <th>Amount</th>
                         <th>Recorded By</th>
                         <th>Notes</th>
@@ -159,6 +239,7 @@ const Expenses: React.FC = () => {
                             <td>{new Date(r.createdAt).toLocaleDateString()}</td>
                             <td>{(r as any).expenseType?.name || r.expenseTypeName || 'N/A'}</td>
                             <td>{r.expenseSubtypeName || '—'}</td>
+                            <td>{r.expenseName || '—'}</td>
                             <td style={{ fontWeight: 'bold' }}>{r.amount?.toLocaleString('en-RW')} RWF</td>
                             <td>{r.managerName}</td>
                             <td>{r.notes}</td>
@@ -213,7 +294,7 @@ const Expenses: React.FC = () => {
                                                     >
                                                         <option value="">-- Select Subtype --</option>
                                                         {subtypes.map((sub, idx) => (
-                                                            <option key={idx} value={sub.name}>{sub.name}</option>
+                                                            <option key={idx} value={sub._id || sub.name}>{sub.name}</option>
                                                         ))}
                                                     </select>
                                                 )}
@@ -259,6 +340,108 @@ const Expenses: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* Expense Name Selection */}
+                            {selectedType && (
+                                <div className="form-group">
+                                    <label>Expense Name (Optional)</label>
+                                    <small style={{ display: 'block', color: '#666', marginBottom: '5px' }}>
+                                        e.g., "Car Tires", "Office Rent", "Electricity Bill"
+                                    </small>
+                                    
+                                    {expenseNames.length > 0 && (
+                                        <>
+                                            <div style={{ marginBottom: '10px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <input 
+                                                        type="radio" 
+                                                        checked={!useCustomExpenseName} 
+                                                        onChange={() => setUseCustomExpenseName(false)} 
+                                                    />
+                                                    Select from existing expense names
+                                                </label>
+                                                
+                                                {!useCustomExpenseName && (
+                                                    <div style={{ position: 'relative', marginTop: '5px' }}>
+                                                        <input 
+                                                            type="text" 
+                                                            value={recordFormData.expenseName}
+                                                            onChange={handleExpenseNameInput}
+                                                            onFocus={() => setShowExpenseNameSuggestions(true)}
+                                                            placeholder="Start typing or select..."
+                                                            style={{ width: '100%' }}
+                                                        />
+                                                        {showExpenseNameSuggestions && filteredExpenseNames.length > 0 && (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: '100%',
+                                                                left: 0,
+                                                                right: 0,
+                                                                backgroundColor: 'white',
+                                                                border: '1px solid #ddd',
+                                                                borderTop: 'none',
+                                                                maxHeight: '200px',
+                                                                overflowY: 'auto',
+                                                                zIndex: 1000,
+                                                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                                            }}>
+                                                                {filteredExpenseNames.map((en, idx) => (
+                                                                    <div
+                                                                        key={idx}
+                                                                        onClick={() => selectExpenseName(en.name)}
+                                                                        style={{
+                                                                            padding: '8px 12px',
+                                                                            cursor: 'pointer',
+                                                                            borderBottom: '1px solid #f0f0f0',
+                                                                            backgroundColor: 'white'
+                                                                        }}
+                                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                                                                    >
+                                                                        <strong>{en.name}</strong>
+                                                                        <small style={{ display: 'block', color: '#666' }}>
+                                                                            {en.subtype ? `${en.type} → ${en.subtype}` : en.type} • Used {en.count} time(s)
+                                                                        </small>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                    
+                                    <div>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <input 
+                                                type="radio" 
+                                                checked={useCustomExpenseName} 
+                                                onChange={() => {
+                                                    setUseCustomExpenseName(true);
+                                                    setShowExpenseNameSuggestions(false);
+                                                }} 
+                                            />
+                                            Add new expense name
+                                        </label>
+                                        
+                                        {useCustomExpenseName && (
+                                            <div style={{ marginTop: '5px' }}>
+                                                <input 
+                                                    type="text" 
+                                                    value={customExpenseName} 
+                                                    onChange={(e) => setCustomExpenseName(e.target.value)}
+                                                    placeholder="Enter new expense name"
+                                                    style={{ width: '100%' }}
+                                                />
+                                                <small style={{ color: '#666' }}>
+                                                    This will be saved for future use
+                                                </small>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Amount and Notes */}
                             <div className="form-group">
                                 <label>Amount (RWF) *</label>
@@ -283,7 +466,10 @@ const Expenses: React.FC = () => {
                             
                             <div className="modal-actions">
                                 <button type="submit" className="btn-primary">Record Expense</button>
-                                <button type="button" className="btn-secondary" onClick={() => setShowRecordModal(false)}>Cancel</button>
+                                <button type="button" className="btn-secondary" onClick={() => {
+                                    setShowRecordModal(false);
+                                    setShowExpenseNameSuggestions(false);
+                                }}>Cancel</button>
                             </div>
                         </form>
                     </div>

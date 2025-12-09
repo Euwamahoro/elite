@@ -120,6 +120,7 @@ export interface OrderDisplay extends Omit<Order, 'orderItems'> {
 // --- Expense Entities ---
 export interface ExpenseRecord {
     _id: string;
+    expenseName?: string;
     expenseSubtype?: string; // New: Subtype field
     expenseTypeName?: string; // New: For direct display
     expenseSubtypeName?: string;
