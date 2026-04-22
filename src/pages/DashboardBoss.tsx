@@ -294,7 +294,7 @@ const DashboardBoss = () => {
                 }}>
                     <div>
                         <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            Business Dashboard
+                            Elite Dashboard
                         </h1>
                         <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
                             Comprehensive overview of your business
