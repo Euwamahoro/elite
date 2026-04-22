@@ -1,4 +1,3 @@
-// src/pages/Products.tsx
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { 
@@ -15,7 +14,8 @@ import {
 import { Product, ProductCategory, ProductFormData, StockLotFormData } from '../types/models';
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss } from '../store/authSlice';
-import '../styles/Global.css'; 
+import '../styles/Global.css';
+import '../styles/proucts.css'; 
 
 // --- Batch Modal Component ---
 interface BatchModalProps {
@@ -63,19 +63,11 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
             alert('Please enter a valid quantity.');
             return;
         }
-
         try {
             await addStockLot(productId, stockForm);
             alert('Stock added successfully! Batch number generated automatically.');
             setShowAddStockModal(false);
-            setStockForm({
-                poId: '',
-                unitCost: 0,
-                quantity: 1,
-                unitPrice: undefined,
-                expiryDate: '',
-                notes: ''
-            });
+            setStockForm({ poId: '', unitCost: 0, quantity: 1, unitPrice: undefined, expiryDate: '', notes: '' });
             fetchBatches();
         } catch (error: any) {
             alert(error.response?.data?.message || 'Failed to add stock.');
@@ -84,11 +76,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-RW', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
+        return date.toLocaleDateString('en-RW', { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
     const calculateDaysUntilExpiry = (expiryDate: string) => {
@@ -101,41 +89,55 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
     return (
         <div className="modal-backdrop">
             <div className="modal-content wide-modal">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                {/* Batch Modal Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                     <div>
-                        <h3>Stock Batches: {productName}</h3>
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                            <select 
-                                value={batchStatusFilter} 
+                        <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            Stock Batches
+                        </h3>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>{productName}</p>
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '14px', alignItems: 'center' }}>
+                            <select
+                                value={batchStatusFilter}
                                 onChange={(e) => setBatchStatusFilter(e.target.value)}
-                                style={{ padding: '5px 10px', borderRadius: '4px' }}
+                                style={{
+                                    padding: '7px 12px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    background: 'var(--background)',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                }}
                             >
                                 <option value="active">Active Batches</option>
                                 <option value="all">All Batches</option>
                                 <option value="expired">Expired Batches</option>
                                 <option value="inactive">Inactive Batches</option>
                             </select>
-                            <button className="btn-success" onClick={() => setShowAddStockModal(true)}>
-                                + Add Stock
+                            <button className="prod-btn prod-btn--success" onClick={() => setShowAddStockModal(true)}>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                Add Stock
                             </button>
                         </div>
                     </div>
-                    <button className="btn-secondary" onClick={onClose}>
-                        Close
-                    </button>
+                    <button className="prod-btn prod-btn--ghost" onClick={onClose}>Close</button>
                 </div>
 
                 {loading ? (
-                    <p>Loading batches...</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading batches…</p>
                 ) : batches.length === 0 ? (
-                    <p>No batches found for this product.</p>
+                    <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>📦</div>
+                        <p style={{ margin: 0, fontSize: '14px' }}>No batches found for this product.</p>
+                    </div>
                 ) : (
-                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <table className="data-table">
+                    <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                        <table className="prod-table">
                             <thead>
                                 <tr>
-                                    <th>Batch Number</th>
-                                    <th>Quantity</th>
+                                    <th>Batch #</th>
+                                    <th>Qty</th>
                                     <th>Unit Cost</th>
                                     <th>Date Acquired</th>
                                     <th>Expiry Date</th>
@@ -148,39 +150,38 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                 {batches.map((batch, index) => {
                                     const daysLeft = batch.expiryDate ? calculateDaysUntilExpiry(batch.expiryDate) : null;
                                     const isExpired = daysLeft !== null && daysLeft < 0;
-                                    
                                     return (
                                         <tr key={index}>
                                             <td>
-                                                <code style={{ fontSize: '0.85em' }}>{batch.batchNumber}</code>
+                                                <code className="prod-code">{batch.batchNumber}</code>
                                                 {batch.poId && (
-                                                    <div style={{ fontSize: '0.75em', color: '#666' }}>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                                         PO: {batch.poId.slice(-6)}
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className={batch.quantity < 10 ? 'stock-low' : ''}>
-                                                {batch.quantity}
+                                            <td>
+                                                <span style={{ fontWeight: 600, color: batch.quantity < 10 ? '#A32D2D' : 'var(--text-primary)' }}>
+                                                    {batch.quantity}
+                                                </span>
                                             </td>
                                             <td>{batch.unitCost?.toLocaleString('en-RW')} RWF</td>
                                             <td>{formatDate(batch.dateAcquired)}</td>
-                                            <td>
-                                                {batch.expiryDate ? formatDate(batch.expiryDate) : 'N/A'}
-                                            </td>
+                                            <td>{batch.expiryDate ? formatDate(batch.expiryDate) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                                             <td>
                                                 {daysLeft !== null && (
-                                                    <span className={isExpired ? 'status-pending' : daysLeft <= 30 ? 'status-partial' : 'status-cleared'}>
-                                                        {isExpired ? 'Expired' : `${daysLeft} days`}
+                                                    <span className={`prod-badge ${isExpired ? 'prod-badge--danger' : daysLeft <= 30 ? 'prod-badge--warning' : 'prod-badge--success'}`}>
+                                                        {isExpired ? 'Expired' : `${daysLeft}d`}
                                                     </span>
                                                 )}
                                             </td>
                                             <td>
-                                                <span className={batch.isActive ? 'status-cleared' : 'status-pending'}>
+                                                <span className={`prod-badge ${batch.isActive ? 'prod-badge--success' : 'prod-badge--danger'}`}>
                                                     {batch.isActive ? 'Active' : 'Inactive'}
                                                 </span>
                                             </td>
-                                            <td style={{ maxWidth: '200px', fontSize: '0.85em' }}>
-                                                {batch.notes || '-'}
+                                            <td style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '160px' }}>
+                                                {batch.notes || <span style={{ color: 'var(--text-muted)' }}>—</span>}
                                             </td>
                                         </tr>
                                     );
@@ -194,65 +195,32 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                 {showAddStockModal && (
                     <div className="modal-backdrop">
                         <div className="modal-content">
-                            <h3>Add Stock to {productName}</h3>
+                            <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>Add Stock — {productName}</h3>
                             <form onSubmit={handleAddStock}>
                                 <div className="form-group">
-                                    <label>PO ID (Optional)</label>
-                                    <input 
-                                        type="text"
-                                        value={stockForm.poId}
-                                        onChange={(e) => setStockForm({...stockForm, poId: e.target.value})}
-                                        placeholder="Enter PO ID if applicable"
-                                    />
-                                    <small>Leave blank for non-PO stock</small>
+                                    <label>PO ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                                    <input type="text" value={stockForm.poId} onChange={(e) => setStockForm({...stockForm, poId: e.target.value})} placeholder="Enter PO ID if applicable" />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'block' }}>Leave blank for non-PO stock</small>
                                 </div>
                                 <div className="form-group">
-                                    <label>Unit Cost (RWF) *</label>
-                                    <input 
-                                        type="number"
-                                        value={stockForm.unitCost || ''}
-                                        onChange={(e) => setStockForm({...stockForm, unitCost: parseFloat(e.target.value) || 0})}
-                                        min="0.01"
-                                        step="0.01"
-                                        required
-                                    />
+                                    <label>Unit Cost (RWF) <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input type="number" value={stockForm.unitCost || ''} onChange={(e) => setStockForm({...stockForm, unitCost: parseFloat(e.target.value) || 0})} min="0.01" step="0.01" required />
                                 </div>
                                 <div className="form-group">
-                                    <label>Quantity *</label>
-                                    <input 
-                                        type="number"
-                                        value={stockForm.quantity || ''}
-                                        onChange={(e) => setStockForm({...stockForm, quantity: parseInt(e.target.value) || 1})}
-                                        min="1"
-                                        required
-                                    />
-                                </div>
-                                {/* NOTE: Removed Unit Price (Selling Price) from Stock Lot as it's now managed on Product level */}
-                                
-                                <div className="form-group">
-                                    <label>Expiry Date (Optional)</label>
-                                    <input 
-                                        type="date"
-                                        value={stockForm.expiryDate || ''}
-                                        onChange={(e) => setStockForm({...stockForm, expiryDate: e.target.value})}
-                                    />
+                                    <label>Quantity <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input type="number" value={stockForm.quantity || ''} onChange={(e) => setStockForm({...stockForm, quantity: parseInt(e.target.value) || 1})} min="1" required />
                                 </div>
                                 <div className="form-group">
-                                    <label>Notes (Optional)</label>
-                                    <textarea 
-                                        value={stockForm.notes || ''}
-                                        onChange={(e) => setStockForm({...stockForm, notes: e.target.value})}
-                                        rows={2}
-                                        placeholder="Any notes about this stock..."
-                                    />
+                                    <label>Expiry Date <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                                    <input type="date" value={stockForm.expiryDate || ''} onChange={(e) => setStockForm({...stockForm, expiryDate: e.target.value})} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Notes <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                                    <textarea value={stockForm.notes || ''} onChange={(e) => setStockForm({...stockForm, notes: e.target.value})} rows={2} placeholder="Any notes about this stock…" />
                                 </div>
                                 <div className="modal-actions">
-                                    <button type="submit" className="btn-primary">
-                                        Add Stock
-                                    </button>
-                                    <button type="button" className="btn-secondary" onClick={() => setShowAddStockModal(false)}>
-                                        Cancel
-                                    </button>
+                                    <button type="submit" className="prod-btn prod-btn--primary">Add Stock</button>
+                                    <button type="button" className="prod-btn prod-btn--ghost" onClick={() => setShowAddStockModal(false)}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -270,7 +238,7 @@ const initialFormData: ProductFormData = {
     description: '',
     unitOfMeasure: '',
     minStockLevel: 0,
-    sellingPrice: 0 // Added default selling price
+    sellingPrice: 0
 };
 
 const Products: React.FC = () => {
@@ -310,21 +278,17 @@ const Products: React.FC = () => {
     useEffect(() => {
         fetchProductsAndCategories();
     }, []);
-    
-    // --- Filter products based on search ---
+
     const filteredProducts = products.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.category.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // --- Edit Product Handler ---
     const handleEdit = async (product: Product) => {
         try {
-            // Fetch the full product details to get minStockLevel and sellingPrice
             const response = await getProductById(product._id);
             const fullProduct = response.data;
-            
             setEditingProduct(fullProduct);
             setFormData({
                 category: fullProduct.category._id,
@@ -333,7 +297,7 @@ const Products: React.FC = () => {
                 unitOfMeasure: fullProduct.unitOfMeasure,
                 minStockLevel: fullProduct.minStockLevel || 0,
                 productCode: fullProduct.productCode || '',
-                sellingPrice: fullProduct.sellingPrice || 0 // Load selling price
+                sellingPrice: fullProduct.sellingPrice || 0
             });
             setShowModal(true);
         } catch (error: any) {
@@ -341,20 +305,15 @@ const Products: React.FC = () => {
         }
     };
 
-    // --- View Batches Handler ---
     const handleViewBatches = (product: Product) => {
-        setSelectedProductForBatches({
-            id: product._id,
-            name: product.name
-        });
+        setSelectedProductForBatches({ id: product._id, name: product.name });
         setShowBatchModal(true);
     };
 
-    // --- Category Submission Handler ---
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await createProductCategory({ name: newCategoryName }); 
+            await createProductCategory({ name: newCategoryName });
             setSuccess(`Category '${newCategoryName}' created successfully!`);
             setTimeout(() => setSuccess(null), 3000);
             setShowCategoryModal(false);
@@ -366,18 +325,13 @@ const Products: React.FC = () => {
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (!isBoss) {
-            alert("Only the Boss is authorized to delete products.");
-            return;
-        }
-        if (!window.confirm(`Are you sure you want to delete product: ${name}? This action is permanent.`)) {
-            return;
-        }
+        if (!isBoss) { alert("Only the Boss is authorized to delete products."); return; }
+        if (!window.confirm(`Are you sure you want to delete product: ${name}? This action is permanent.`)) return;
         try {
             await deleteProduct(id);
             setSuccess(`Product ${name} deleted successfully!`);
             setTimeout(() => setSuccess(null), 3000);
-            fetchProductsAndCategories(); 
+            fetchProductsAndCategories();
         } catch (error: any) {
             setError(error.response?.data?.message || `Failed to delete product ${name}.`);
         }
@@ -387,23 +341,18 @@ const Products: React.FC = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // --- Handle both Create and Update ---
     const handleSubmitProduct = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSuccess(null);
-        
         try {
             if (editingProduct) {
-                // Update existing product
                 await updateProduct(editingProduct._id, formData);
                 setSuccess('Product updated successfully!');
             } else {
-                // Create new product
                 await createProduct(formData);
                 setSuccess('Product created successfully!');
             }
-            
             setTimeout(() => setSuccess(null), 3000);
             setShowModal(false);
             setFormData(initialFormData);
@@ -420,261 +369,222 @@ const Products: React.FC = () => {
         setEditingProduct(null);
     };
 
-    const getStockStatusClass = (product: Product) => {
-        if (product.totalStock === 0) return 'stock-out';
-        if (product.isLowStock) return 'stock-low';
-        return '';
-    };
-
-    if (loading) return <Layout pageTitle="Product Inventory"><div>Loading Products...</div></Layout>;
+    if (loading) return <Layout pageTitle="Product Inventory"><div style={{ padding: '40px', color: 'var(--text-secondary)' }}>Loading Products…</div></Layout>;
 
     return (
         <Layout pageTitle="Product Inventory">
-            <div className="page-header">
-                <div>
-                    <h2>All Products ({filteredProducts.length})</h2>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                        <input
-                            type="text"
-                            placeholder="Search products by name, code, or category..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ width: '400px', padding: '8px 12px' }}
-                        />
+            <div style={{ padding: '28px 30px', maxWidth: '1600px', margin: '0 auto' }}>
+
+                {/* ── Page Header ─────────────────────────────────── */}
+                <div className="prod-page-header">
+                    <div>
+                        <h1 className="prod-page-title">
+                            Product Inventory
+                            <span className="prod-count-badge">{filteredProducts.length}</span>
+                        </h1>
+                        <p className="prod-page-sub">Manage your products, stock levels and batches</p>
+                        {/* Search */}
+                        <div className="prod-search-wrap">
+                            <svg className="prod-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                                <path d="M6.5 11a4.5 4.5 0 100-9 4.5 4.5 0 000 9zM13 13l-2.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                            <input
+                                type="text"
+                                className="prod-search"
+                                placeholder="Search by name, code or category…"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        <button className="prod-btn prod-btn--ghost" onClick={() => setShowCategoryModal(true)}>
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                            Add Category
+                        </button>
+                        <button className="prod-btn prod-btn--primary" onClick={() => setShowModal(true)}>
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                            New Product
+                        </button>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button className="btn-secondary" onClick={() => setShowCategoryModal(true)}>+ Add Category</button>
-                    <button className="btn-success" onClick={() => setShowModal(true)}>Add New Product</button>
-                </div>
-            </div>
-            
-            {error && <p className="error-message">{error}</p>}
-            {success && <p className="success-message">{success}</p>}
 
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Code</th>
-                        <th>Category</th>
-                        <th>Total Stock</th>
-                        <th>Selling Price</th> {/* Updated Header */}
-                        <th>UoM</th>
-                        <th>Min Stock</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredProducts.map((product) => (
-                        <tr key={product._id}>
-                            <td>
-                                <strong>{product.name}</strong>
-                                {product.description && (
-                                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '2px' }}>
-                                        {product.description.length > 50 
-                                            ? `${product.description.substring(0, 50)}...`
-                                            : product.description
-                                        }
-                                    </div>
-                                )}
-                            </td>
-                            <td>
-                                <code style={{ background: '#f1f1f1', padding: '2px 6px', borderRadius: '3px' }}>
-                                    {product.productCode || 'N/A'}
-                                </code>
-                            </td>
-                            <td>{product.category.name}</td>
-                            <td className={getStockStatusClass(product)}>
-                                {product.totalStock}
-                                {product.isLowStock && (
-                                    <div style={{ fontSize: '0.75em', color: '#dc3545' }}>
-                                        ⚠️ Low Stock
-                                    </div>
-                                )}
-                            </td>
-                            {/* Display Master Selling Price */}
-                            <td>{product.sellingPrice?.toLocaleString('en-RW') || 0} RWF</td>
-                            <td>{product.unitOfMeasure}</td>
-                            <td>{product.minStockLevel || 0}</td>
-                            <td>
-                                <span className={product.isLowStock ? 'status-partial' : 'status-cleared'}>
-                                    {product.isLowStock ? 'Low Stock' : 'OK'}
-                                </span>
-                            </td>
-                            <td>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                    <button 
-                                        className="btn-info btn-small"
-                                        onClick={() => handleViewBatches(product)}
-                                    >
-                                        View Batches
-                                    </button>
-                                    <button 
-                                        className="btn-edit btn-small" 
-                                        onClick={() => handleEdit(product)}
-                                    >
-                                        Edit
-                                    </button>
-                                    {isBoss && ( 
-                                        <button 
-                                            className="btn-delete btn-small" 
-                                            onClick={() => handleDelete(product._id, product.name)}
-                                        >
-                                            Delete
-                                        </button>
-                                    )}
+                {/* ── Alerts ──────────────────────────────────────── */}
+                {error   && <div className="prod-alert prod-alert--error">{error}</div>}
+                {success && <div className="prod-alert prod-alert--success">{success}</div>}
+
+                {/* ── Table ───────────────────────────────────────── */}
+                <div className="prod-table-wrap">
+                    <table className="prod-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Code</th>
+                                <th>Category</th>
+                                <th>Total Stock</th>
+                                <th>Selling Price</th>
+                                <th>UoM</th>
+                                <th>Min Stock</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredProducts.map((product) => (
+                                <tr key={product._id}>
+                                    <td>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                                        {product.description && (
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                {product.description.length > 55
+                                                    ? `${product.description.substring(0, 55)}…`
+                                                    : product.description}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td>
+                                        <code className="prod-code">{product.productCode || '—'}</code>
+                                    </td>
+                                    <td>
+                                        <span className="prod-category-pill">{product.category.name}</span>
+                                    </td>
+                                    <td>
+                                        <span style={{ fontWeight: 600, color: product.isLowStock ? '#A32D2D' : 'var(--text-primary)' }}>
+                                            {product.totalStock}
+                                        </span>
+                                        {product.isLowStock && (
+                                            <div style={{ fontSize: '11px', color: '#A32D2D', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 9.5h9L5.5 1z" stroke="#A32D2D" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2M5.5 8h.01" stroke="#A32D2D" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                                                Low Stock
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td style={{ fontWeight: 500 }}>{(product.sellingPrice ?? 0).toLocaleString('en-RW')} RWF</td>
+                                    <td style={{ color: 'var(--text-secondary)' }}>{product.unitOfMeasure}</td>
+                                    <td style={{ color: 'var(--text-secondary)' }}>{product.minStockLevel || 0}</td>
+                                    <td>
+                                        <span className={`prod-badge ${product.isLowStock ? 'prod-badge--warning' : 'prod-badge--success'}`}>
+                                            {product.isLowStock ? 'Low Stock' : 'OK'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="prod-actions">
+                                            <button className="prod-btn prod-btn--info prod-btn--sm" onClick={() => handleViewBatches(product)}>
+                                                Batches
+                                            </button>
+                                            <button className="prod-btn prod-btn--success prod-btn--sm" onClick={() => handleEdit(product)}>
+                                                Edit
+                                            </button>
+                                            {isBoss && (
+                                                <button className="prod-btn prod-btn--danger prod-btn--sm" onClick={() => handleDelete(product._id, product.name)}>
+                                                    Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {filteredProducts.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
+                            {searchTerm
+                                ? <><div style={{ fontSize: '28px', marginBottom: '8px' }}>🔍</div><p style={{ margin: 0, fontSize: '14px' }}>No products matching "<strong>{searchTerm}</strong>"</p></>
+                                : <><div style={{ fontSize: '28px', marginBottom: '8px' }}>📦</div><p style={{ margin: 0, fontSize: '14px' }}>No products yet. Add your first product.</p></>
+                            }
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Product Modal (Add / Edit) ───────────────────── */}
+                {showModal && (
+                    <div className="modal-backdrop">
+                        <div className="modal-content">
+                            <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>
+                                {editingProduct ? 'Edit Product' : 'New Product'}
+                            </h3>
+                            <form onSubmit={handleSubmitProduct}>
+                                <div className="form-group">
+                                    <label>Category <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <select name="category" value={formData.category} onChange={handleFormChange} required>
+                                        <option value="">— Select Category —</option>
+                                        {categories.map(cat => (
+                                            <option key={cat._id} value={cat._id}>{cat.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-
-            {filteredProducts.length === 0 && searchTerm && (
-                <p style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                    No products found matching "{searchTerm}"
-                </p>
-            )}
-
-            {/* --- Product Modal (Add/Edit) --- */}
-            {showModal && (
-                <div className="modal-backdrop">
-                    <div className="modal-content">
-                        <h3>{editingProduct ? 'Edit Product' : 'Create New Product'}</h3>
-                        <form onSubmit={handleSubmitProduct}>
-                            
-                            <div className="form-group">
-                                <label>Category *</label>
-                                <select name="category" value={formData.category} onChange={handleFormChange} required>
-                                    <option value="">-- Select Category --</option>
-                                    {categories.map(cat => (
-                                        <option key={cat._id} value={cat._id}>{cat.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label>Product Name *</label>
-                                <input 
-                                    type="text" 
-                                    name="name" 
-                                    value={formData.name} 
-                                    onChange={handleFormChange} 
-                                    required 
-                                />
-                            </div>
-
-                            {/* NEW: Selling Price Input */}
-                            <div className="form-group">
-                                <label>Standard Selling Price (RWF) *</label>
-                                <input 
-                                    type="number" 
-                                    name="sellingPrice" 
-                                    value={formData.sellingPrice || ''} 
-                                    onChange={handleFormChange}
-                                    min="0"
-                                    required
-                                    placeholder="e.g. 500"
-                                />
-                                <small style={{color: '#666'}}>This price will be used when selling items from any batch.</small>
-                            </div>
-
-                            <div className="form-group">
-                                <label>Product Code (Optional)</label>
-                                <input 
-                                    type="text" 
-                                    name="productCode" 
-                                    value={formData.productCode || ''} 
-                                    onChange={handleFormChange}
-                                    placeholder="Auto-generated if empty"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>Unit of Measure (e.g., kg, sack) *</label>
-                                <input 
-                                    type="text" 
-                                    name="unitOfMeasure" 
-                                    value={formData.unitOfMeasure} 
-                                    onChange={handleFormChange} 
-                                    required 
-                                />
-                            </div>
-                            
-                            <div className="form-group">
-                                <label>Description (Optional)</label>
-                                <textarea 
-                                    name="description" 
-                                    value={formData.description} 
-                                    onChange={handleFormChange} 
-                                    rows={3}
-                                    placeholder="Product description..."
-                                ></textarea>
-                            </div>
-
-                            <div className="form-group">
-                                <label>Minimum Stock Level</label>
-                                <input 
-                                    type="number" 
-                                    name="minStockLevel" 
-                                    value={formData.minStockLevel || 0} 
-                                    onChange={handleFormChange}
-                                    min="0"
-                                    step="1"
-                                />
-                                <small>Alerts when stock falls below this level</small>
-                            </div>
-
-                            <div className="modal-actions">
-                                <button type="submit" className="btn-primary">
-                                    {editingProduct ? 'Update Product' : 'Create Product'}
-                                </button>
-                                <button type="button" className="btn-secondary" onClick={handleCloseModal}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
+                                <div className="form-group">
+                                    <label>Product Name <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input type="text" name="name" value={formData.name} onChange={handleFormChange} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Standard Selling Price (RWF) <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input type="number" name="sellingPrice" value={formData.sellingPrice || ''} onChange={handleFormChange} min="0" required placeholder="e.g. 500" />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'block' }}>Used when selling from any batch.</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Product Code <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                                    <input type="text" name="productCode" value={formData.productCode || ''} onChange={handleFormChange} placeholder="Auto-generated if empty" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Unit of Measure <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input type="text" name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleFormChange} required placeholder="e.g. kg, sack, piece" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                                    <textarea name="description" value={formData.description} onChange={handleFormChange} rows={3} placeholder="Product description…" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Minimum Stock Level</label>
+                                    <input type="number" name="minStockLevel" value={formData.minStockLevel || 0} onChange={handleFormChange} min="0" step="1" />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'block' }}>Alert when stock falls below this level.</small>
+                                </div>
+                                <div className="modal-actions">
+                                    <button type="submit" className="prod-btn prod-btn--primary">
+                                        {editingProduct ? 'Update Product' : 'Create Product'}
+                                    </button>
+                                    <button type="button" className="prod-btn prod-btn--ghost" onClick={handleCloseModal}>Cancel</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* --- Category Creation Modal --- */}
-            {showCategoryModal && (
-                <div className="modal-backdrop">
-                    <div className="modal-content">
-                        <h3>Create New Category</h3>
-                        <form onSubmit={handleCreateCategory}>
-                            <div className="form-group">
-                                <label>Category Name *</label>
-                                <input 
-                                    type="text" 
-                                    value={newCategoryName} 
-                                    onChange={(e) => setNewCategoryName(e.target.value)} 
-                                    required 
-                                    placeholder="e.g., Cement, Tools, Safety Gear"
-                                />
-                            </div>
-                            <div className="modal-actions">
-                                <button type="submit" className="btn-primary">Create Category</button>
-                                <button type="button" className="btn-secondary" onClick={() => setShowCategoryModal(false)}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
+                {/* ── Category Modal ───────────────────────────────── */}
+                {showCategoryModal && (
+                    <div className="modal-backdrop">
+                        <div className="modal-content">
+                            <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>New Category</h3>
+                            <form onSubmit={handleCreateCategory}>
+                                <div className="form-group">
+                                    <label>Category Name <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <input
+                                        type="text"
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        required
+                                        placeholder="e.g. Cement, Tools, Safety Gear"
+                                    />
+                                </div>
+                                <div className="modal-actions">
+                                    <button type="submit" className="prod-btn prod-btn--primary">Create Category</button>
+                                    <button type="button" className="prod-btn prod-btn--ghost" onClick={() => setShowCategoryModal(false)}>Cancel</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* --- Batch Modal --- */}
-            {showBatchModal && selectedProductForBatches && (
-                <BatchModal 
-                    productId={selectedProductForBatches.id}
-                    productName={selectedProductForBatches.name}
-                    onClose={() => { setShowBatchModal(false); setSelectedProductForBatches(null); }}
-                />
-            )}
+                {/* ── Batch Modal ──────────────────────────────────── */}
+                {showBatchModal && selectedProductForBatches && (
+                    <BatchModal
+                        productId={selectedProductForBatches.id}
+                        productName={selectedProductForBatches.name}
+                        onClose={() => { setShowBatchModal(false); setSelectedProductForBatches(null); }}
+                    />
+                )}
+            </div>
         </Layout>
     );
 };

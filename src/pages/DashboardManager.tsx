@@ -2,7 +2,7 @@ import { getManagerDailyReport } from '../api/apiService';
 import { useState, useEffect } from 'react';
 import { Download, FileText, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package } from 'lucide-react';
 import { ManagerDailyReport } from '../types/models';
-import Layout from '../components/Layout'; // ADD THIS IMPORT
+import Layout from '../components/Layout';
 
 const DashboardManager = () => {
     const [report, setReport] = useState<ManagerDailyReport | null>(null);

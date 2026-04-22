@@ -1,4 +1,3 @@
-// src/components/Sidebar.tsx - UPDATED VERSION
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
@@ -10,82 +9,88 @@ import {
 import '../styles/Sidebar.css';
 
 const Sidebar: React.FC = () => {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
     const user = useAppSelector(selectUser);
     const isBoss = useAppSelector(selectIsBoss);
 
-    // Dynamic dashboard link based on role
     const dashboardPath = isBoss ? "/dashboard/boss" : "/dashboard/manager";
 
-    const toggleSidebar = () => {
-        setIsOpen(!isOpen);
-    };
-
-    const closeSidebar = () => {
-        setIsOpen(false);
-    };
-
-    // Navigation items with icons
     const navItems: Array<{ to: string; icon: React.ReactElement; label: string; className?: string }> = [
-        { to: dashboardPath, icon: <Home size={20} />, label: 'Dashboard' },
-        { to: "/products", icon: <Package size={20} />, label: 'Products' },
-        { to: "/orders", icon: <ShoppingCart size={20} />, label: 'Sales' },
-        { to: "/expenses", icon: <DollarSign size={20} />, label: 'Accounting' },
-        { to: "/suppliers", icon: <Users size={20} />, label: 'Suppliers' },
-        { to: "/po", icon: <FileText size={20} />, label: 'Purchase Orders' },
+        { to: dashboardPath,  icon: <Home size={18} />,         label: 'Dashboard' },
+        { to: "/products",    icon: <Package size={18} />,      label: 'Products' },
+        { to: "/orders",      icon: <ShoppingCart size={18} />, label: 'Sales' },
+        { to: "/expenses",    icon: <DollarSign size={18} />,   label: 'Accounting' },
+        { to: "/suppliers",   icon: <Users size={18} />,        label: 'Suppliers' },
+        { to: "/po",          icon: <FileText size={18} />,     label: 'Purchase Orders' },
     ];
 
-    // Add boss-only items
     if (isBoss) {
         navItems.push(
-            { to: "/users", icon: <UserCircle size={20} />, label: 'Users', className: 'boss-only' },
-            { to: "/reports", icon: <TrendingUp size={20} />, label: 'Advanced Reports', className: 'boss-only' }
+            { to: "/users",   icon: <UserCircle size={18} />, label: 'Users',            className: 'boss-only' },
+            { to: "/reports", icon: <TrendingUp size={18} />, label: 'Advanced Reports', className: 'boss-only' }
         );
     }
 
     return (
         <>
-            {/* Mobile Toggle Button */}
-            <button className="sidebar-toggle" onClick={toggleSidebar}>
-                ☰
-            </button>
+            {/* Invisible hover trigger on left edge */}
+            <div
+                className="sidebar-trigger"
+                onMouseEnter={() => setIsHovering(true)}
+            />
 
-            {/* Overlay for mobile */}
-            <div 
-                className={`sidebar-overlay ${isOpen ? 'show' : ''}`} 
-                onClick={closeSidebar}
-            ></div>
+            {/* Full-page blur overlay — sits behind sidebar, blurs the page */}
+            <div
+                className={`sidebar-overlay ${isHovering ? 'visible' : ''}`}
+                onMouseEnter={() => setIsHovering(false)}
+            />
 
-            {/* Sidebar */}
-            <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-                <h1 className="sidebar-logo">ELITE MOVERS</h1>
-                
-                <h3 className="sidebar-menu-title">MAIN MENU</h3>
-                
-                <nav className="sidebar-nav">
-                    {navItems.map((item) => (
-                        <NavLink 
-                            key={item.to}
-                            to={item.to} 
-                            className={({ isActive }) => 
-                                `nav-item ${isActive ? 'active' : ''} ${item.className || ''}`
-                            }
-                            onClick={closeSidebar}
-                        >
-                            <span className="nav-icon">
-                                {item.icon}
-                            </span>
-                            <span>{item.label}</span>
-                            {item.className === 'boss-only' && (
-                                <span className="nav-badge">BOSS</span>
+            <div
+                className={`sidebar-popup ${isHovering ? 'visible' : ''}`}
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+            >
+                {/* Logo */}
+                <div className="sidebar-logo-container">
+                    <div className="sidebar-logo">EM</div>
+                </div>
+
+                {/* Navigation */}
+                <div className="sidebar-nav">
+                    {navItems.map((item, index) => (
+                        <React.Fragment key={item.to}>
+                            {index > 0 && (
+                                <div className={`nav-connector ${item.className === 'boss-only' && index === navItems.findIndex(i => i.className === 'boss-only') ? 'nav-connector--boss' : ''}`} />
                             )}
-                        </NavLink>
+                            <NavLink
+                                to={item.to}
+                                className={({ isActive }) =>
+                                    `nav-item ${isActive ? 'active' : ''} ${item.className || ''}`
+                                }
+                            >
+                                <div className="nav-circle">
+                                    <span className="nav-icon">{item.icon}</span>
+                                </div>
+                                <span className="nav-label">
+                                    {item.label}
+                                    {item.className === 'boss-only' && (
+                                        <span className="nav-badge">BOSS</span>
+                                    )}
+                                </span>
+                            </NavLink>
+                        </React.Fragment>
                     ))}
-                </nav>
-                
+                </div>
+
+                {/* User Info */}
                 <div className="sidebar-user-info">
-                    <div className="user-name">{user?.name || 'User'}</div>
-                    <div className="user-role">{user?.role || (isBoss ? 'Boss' : 'Manager')}</div>
+                    <div className="user-avatar">
+                        {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="user-details">
+                        <div className="user-name">{user?.name || 'User'}</div>
+                        <div className="user-role">{user?.role || (isBoss ? 'Boss' : 'Manager')}</div>
+                    </div>
                 </div>
             </div>
         </>
