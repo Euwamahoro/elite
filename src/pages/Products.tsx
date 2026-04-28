@@ -14,6 +14,7 @@ import {
 import { Product, ProductCategory, ProductFormData, StockLotFormData } from '../types/models';
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss } from '../store/authSlice';
+import ProcessProductionModal from '../components/Production/ProcessProductionModal';
 import '../styles/Global.css';
 import '../styles/proucts.css'; 
 
@@ -250,6 +251,7 @@ const Products: React.FC = () => {
     const [showModal, setShowModal] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showBatchModal, setShowBatchModal] = useState(false);
+    const [showProcessModal, setShowProcessModal] = useState(false);
     const [selectedProductForBatches, setSelectedProductForBatches] = useState<{id: string, name: string} | null>(null);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
@@ -259,21 +261,22 @@ const Products: React.FC = () => {
     const isBoss = useAppSelector(selectIsBoss);
 
     const fetchProductsAndCategories = async () => {
-        try {
-            const [productsRes, categoriesRes] = await Promise.all([
-                getProducts(),
-                getProductCategories(),
-            ]);
-            setProducts(productsRes.data);
-            setCategories(categoriesRes.data);
-            setError(null);
-        } catch (error: any) {
-            setError(error.response?.data?.message || 'Failed to fetch initial data.');
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+        const [productsRes, categoriesRes] = await Promise.all([
+            getProducts(),
+            getProductCategories(),
+        ]);
+        // Only show finished products (productType === 'finished')
+        const finishedProducts = productsRes.data.filter(p => p.productType === 'finished');
+        setProducts(finishedProducts);
+        setCategories(categoriesRes.data);
+        setError(null);
+    } catch (error: any) {
+        setError(error.response?.data?.message || 'Failed to fetch initial data.');
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
         fetchProductsAndCategories();
@@ -308,6 +311,10 @@ const Products: React.FC = () => {
     const handleViewBatches = (product: Product) => {
         setSelectedProductForBatches({ id: product._id, name: product.name });
         setShowBatchModal(true);
+    };
+
+    const handleProcessProduction = () => {
+        setShowProcessModal(true);
     };
 
     const handleCreateCategory = async (e: React.FormEvent) => {
@@ -406,6 +413,16 @@ const Products: React.FC = () => {
                             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                             New Product
                         </button>
+                        <button 
+                            className="prod-btn prod-btn--primary" 
+                            onClick={handleProcessProduction} 
+                            style={{ background: '#8B5CF6', borderColor: '#8B5CF6' }}
+                        >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                <path d="M1 6.5h11M6.5 1v11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                            </svg>
+                            Process Production
+                        </button>
                     </div>
                 </div>
 
@@ -474,6 +491,14 @@ const Products: React.FC = () => {
                                             </button>
                                             <button className="prod-btn prod-btn--success prod-btn--sm" onClick={() => handleEdit(product)}>
                                                 Edit
+                                            </button>
+                                            {/* Process button for all products - shows production modal */}
+                                            <button 
+                                                className="prod-btn prod-btn--primary prod-btn--sm" 
+                                                onClick={handleProcessProduction}
+                                                style={{ background: '#8B5CF6', borderColor: '#8B5CF6' }}
+                                            >
+                                                Process
                                             </button>
                                             {isBoss && (
                                                 <button className="prod-btn prod-btn--danger prod-btn--sm" onClick={() => handleDelete(product._id, product.name)}>
@@ -582,6 +607,16 @@ const Products: React.FC = () => {
                         productId={selectedProductForBatches.id}
                         productName={selectedProductForBatches.name}
                         onClose={() => { setShowBatchModal(false); setSelectedProductForBatches(null); }}
+                    />
+                )}
+
+                {/* ── Process Production Modal ──────────────────────── */}
+                {showProcessModal && (
+                    <ProcessProductionModal
+                        onClose={() => setShowProcessModal(false)}
+                        onSuccess={() => {
+                            fetchProductsAndCategories();
+                        }}
                     />
                 )}
             </div>

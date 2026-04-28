@@ -25,6 +25,7 @@ import {
 } from '../types/models'; 
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss, selectUser } from '../store/authSlice';
+import RawMaterialsModal from '../pages/purchaseOrders/RawMaterialsModel';
 import '../styles/Global.css'; 
 
 // --- PO ITEM SUB-COMPONENT ---
@@ -32,7 +33,6 @@ interface POItemForm {
     product: string;
     quantity: number;
     unitCost: number;
-    // Removed unitPrice (selling price)
 }
 
 const initialPOFormData: POFormData = {
@@ -45,13 +45,14 @@ const PurchaseOrders: React.FC = () => {
     const [pos, setPos] = useState<PurchaseOrder[]>([]);
     const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]); 
-    const [availableProducts, setAvailableProducts] = useState<Product[]>([]); 
+    const [rawMaterials, setRawMaterials] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreatePOModal, setShowCreatePOModal] = useState(false);
     const [showPODetailModal, setShowPODetailModal] = useState(false);
     const [showReceiveModal, setShowReceiveModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [poFormData, setPoFormData] = useState<POFormData>(initialPOFormData);
@@ -61,7 +62,6 @@ const PurchaseOrders: React.FC = () => {
     const [itemProduct, setItemProduct] = useState('');
     const [itemQuantity, setItemQuantity] = useState(1);
     const [itemCost, setItemCost] = useState(0);
-    // Removed itemSellingPrice state
 
     // Receive states
     const [receiveNotes, setReceiveNotes] = useState('');
@@ -79,6 +79,15 @@ const PurchaseOrders: React.FC = () => {
     const isBoss = useAppSelector(selectIsBoss);
     const user = useAppSelector(selectUser);
 
+    // Helper function to check if a product is a raw material
+    const isRawMaterial = (product: Product): boolean => {
+        const finishedKeywords = ['flour', 'bran', 'meal', 'processed', 'packaged'];
+        const productNameLower = product.name.toLowerCase();
+        const isFinished = finishedKeywords.some(keyword => productNameLower.includes(keyword));
+        if (isFinished) return false;
+        return true;
+    };
+
     const fetchAllData = async () => {
         try {
             const [poRes, supplierRes, productRes, statsRes] = await Promise.all([
@@ -90,7 +99,6 @@ const PurchaseOrders: React.FC = () => {
             
             setPos(poRes.data.pos || poRes.data || []);
             
-            // Handle different supplier response structures
             const supplierData: any = supplierRes.data;
             if (supplierData && Array.isArray(supplierData)) {
                 setSuppliers(supplierData);
@@ -102,14 +110,17 @@ const PurchaseOrders: React.FC = () => {
                 setSuppliers([]);
             }
             
-            setAvailableProducts(productRes.data || []);
+            const allProducts = productRes.data || [];
+            const rawOnly = allProducts.filter(isRawMaterial);
+            setRawMaterials(rawOnly);
+            
             setDashboardStats(statsRes.data || {});
             setError(null);
         } catch (error: any) {
             console.error('Fetch error:', error);
             setError(error.response?.data?.message || 'Failed to fetch initial data.');
             setSuppliers([]);
-            setAvailableProducts([]);
+            setRawMaterials([]);
             setPos([]);
         } finally {
             setLoading(false);
@@ -124,6 +135,12 @@ const PurchaseOrders: React.FC = () => {
     const handleAddItem = () => {
         if (!itemProduct || itemQuantity <= 0 || itemCost <= 0) {
             alert('Please select product, quantity, and unit cost.');
+            return;
+        }
+        
+        const selectedProduct = rawMaterials.find(p => p._id === itemProduct);
+        if (!selectedProduct) {
+            alert('Selected product is not available for purchase. Only raw materials can be purchased via PO.');
             return;
         }
         
@@ -144,54 +161,55 @@ const PurchaseOrders: React.FC = () => {
     };
 
     // --- Core PO Submission Logic ---
-   const handleCreatePO = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    
-    if (!poFormData.supplier || poFormData.poItems.length === 0) {
-        setError('Missing Supplier or Items.');
-        return;
-    }
+    const handleCreatePO = async (e: FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSuccess(null);
+        
+        if (!poFormData.supplier || poFormData.poItems.length === 0) {
+            setError('Missing Supplier or Items.');
+            return;
+        }
 
-    try {
-        // Calculate totals
-        const itemsTotal = poFormData.poItems.reduce((sum, item) => 
-            sum + (item.quantity * item.unitCost), 0
-        );
-        
-        const payload = {
-            supplier: poFormData.supplier,
-            paymentTerms: poFormData.paymentTerms || 'Credit 30 days',
-            poItems: poFormData.poItems.map(item => ({
-                product: item.product,
-                name: '', // Backend will fill this
-                quantity: item.quantity,
-                unitCost: item.unitCost,
-                // No unitPrice here, strictly cost
-                subtotal: item.quantity * item.unitCost
-            })),
-            totalCost: itemsTotal,
-            grandTotal: itemsTotal,
-            taxAmount: 0,
-            shippingCost: 0,
-            discount: 0
-        };
+        try {
+            const itemsTotal = poFormData.poItems.reduce((sum, item) => 
+                sum + (item.quantity * item.unitCost), 0
+            );
+            
+            const payload = {
+                supplier: poFormData.supplier,
+                paymentTerms: poFormData.paymentTerms || 'Credit 30 days',
+                poItems: poFormData.poItems.map(item => {
+                    const product = rawMaterials.find(p => p._id === item.product);
+                    return {
+                        product: item.product,
+                        name: product?.name || 'Raw Material',
+                        quantity: item.quantity,
+                        unitCost: item.unitCost,
+                        subtotal: item.quantity * item.unitCost
+                    };
+                }),
+                totalCost: itemsTotal,
+                grandTotal: itemsTotal,
+                taxAmount: 0,
+                shippingCost: 0,
+                discount: 0
+            };
 
-        const response = await createPO(payload);
-        
-        setSuccess(`Purchase Order ${response.data.poNumber} created successfully as Draft!`);
-        setTimeout(() => {
-            setShowCreatePOModal(false);
-            setPoFormData(initialPOFormData);
-            fetchAllData();
-        }, 2000);
-        
-    } catch (error: any) {
-        console.error("PO Creation Failed:", error);
-        setError(error.response?.data?.message || 'Failed to create Purchase Order.');
-    }
-};
+            const response = await createPO(payload);
+            
+            setSuccess(`Purchase Order ${response.data.poNumber} created successfully as Draft!`);
+            setTimeout(() => {
+                setShowCreatePOModal(false);
+                setPoFormData(initialPOFormData);
+                fetchAllData();
+            }, 2000);
+            
+        } catch (error: any) {
+            console.error("PO Creation Failed:", error);
+            setError(error.response?.data?.message || 'Failed to create Purchase Order.');
+        }
+    };
 
     // --- PO Workflow Actions ---
     const handleSubmitPO = async (id: string) => {
@@ -315,14 +333,11 @@ const PurchaseOrders: React.FC = () => {
     const handleViewPODetails = async (id: string) => {
         try {
             const response = await getPOById(id);
-            // FIX: The backend returns { success: true, po: {...}, ... }
-            // We need to extract the 'po' object from the response data.
             const data: any = response.data;
             
             if (data.po) {
                 setSelectedPO(data.po);
             } else {
-                // Fallback in case the structure changes or is direct
                 setSelectedPO(data);
             }
             
@@ -376,10 +391,13 @@ const PurchaseOrders: React.FC = () => {
     if (loading) return <Layout pageTitle="Purchase Orders"><div>Loading POs...</div></Layout>;
 
     return (
-        <Layout pageTitle="Purchase Orders (Stock Inflow)">
+        <Layout pageTitle="Purchase Orders (Raw Material Stock Inflow)">
             <div className="page-header">
                 <div>
                     <h2>Purchase Orders ({pos.length})</h2>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '5px' }}>
+                        📦 Only raw materials can be purchased. Finished products (flour, bran) are created via Production.
+                    </div>
                     {dashboardStats && (
                         <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
                             <span className="status-badge">Draft: {dashboardStats.byStatus?.Draft || 0}</span>
@@ -389,9 +407,14 @@ const PurchaseOrders: React.FC = () => {
                         </div>
                     )}
                 </div>
-                <button className="btn-success" onClick={() => {setShowCreatePOModal(true); setError(null); setSuccess(null);}}>
-                    Create New PO
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="btn-secondary" onClick={() => setShowRawMaterialModal(true)}>
+                        + Manage Raw Materials
+                    </button>
+                    <button className="btn-success" onClick={() => {setShowCreatePOModal(true); setError(null); setSuccess(null);}}>
+                        Create New PO
+                    </button>
+                </div>
             </div>
             
             {error && <p className="error-message">{error}</p>}
@@ -460,17 +483,26 @@ const PurchaseOrders: React.FC = () => {
                     ))}
                 </tbody>
             </table>
-            
-            {/* --- Create PO Modal --- */}
+
+            {/* Raw Materials Modal */}
+            <RawMaterialsModal
+                isOpen={showRawMaterialModal}
+                onClose={() => setShowRawMaterialModal(false)}
+                onSuccess={() => fetchAllData()}
+            />
+
+            {/* Create PO Modal */}
             {showCreatePOModal && (
                 <div className="modal-backdrop">
                     <div className="modal-content wide-modal">
                         <h3>Create New Purchase Order</h3>
+                        <div style={{ background: '#e8f4f8', padding: '10px', borderRadius: '5px', marginBottom: '15px', fontSize: '13px' }}>
+                            ℹ️ <strong>Note:</strong> Only <strong>raw materials</strong> (e.g., maize, cassava) can be purchased. 
+                            Finished products (flour, bran) are created through the <strong>Production</strong> feature.
+                        </div>
                         {error && <p className="error-message">{error}</p>}
                         {success && <p className="success-message">{success}</p>}
                         <form onSubmit={handleCreatePO}>
-                            
-                            {/* 1. SUPPLIER SELECTION */}
                             <div className="form-group">
                                 <label>Supplier *</label>
                                 <select 
@@ -487,7 +519,6 @@ const PurchaseOrders: React.FC = () => {
                                 </select>
                             </div>
 
-                            {/* 2. PAYMENT TERMS */}
                             <div className="form-group">
                                 <label>Payment Terms</label>
                                 <select 
@@ -503,50 +534,57 @@ const PurchaseOrders: React.FC = () => {
                                 </select>
                             </div>
 
-                            {/* 3. ITEM SELECTION */}
                             <fieldset className="fieldset-items">
-                                <legend>Add Items *</legend>
-                                <div className="item-input-group">
-                                    <select 
-                                        value={itemProduct} 
-                                        onChange={(e) => setItemProduct(e.target.value)}
-                                        style={{ width: '45%' }}
-                                    >
-                                        <option value="">-- Product --</option>
-                                        {Array.isArray(availableProducts) && availableProducts.map(p => (
-                                            <option key={p._id} value={p._id}>
-                                                {p.name} ({p.productCode}) - Stock: {p.totalStock}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <input 
-                                        type="number" 
-                                        placeholder="Quantity" 
-                                        value={itemQuantity} 
-                                        onChange={(e) => setItemQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
-                                        style={{ width: '15%' }}
-                                        min="1"
-                                    />
-                                    <input 
-                                        type="number" 
-                                        placeholder="Unit Cost (Buying Price)" 
-                                        value={itemCost} 
-                                        onChange={(e) => setItemCost(Math.max(0, parseFloat(e.target.value) || 0))} 
-                                        style={{ width: '20%' }}
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                    <button 
-                                        type="button" 
-                                        className="btn-success" 
-                                        onClick={handleAddItem}
-                                        style={{ width: '20%' }}
-                                    >
-                                        Add Item
-                                    </button>
-                                </div>
+                                <legend>Add Raw Material Items *</legend>
                                 
-                                {/* Current Items List */}
+                                {rawMaterials.length === 0 ? (
+                                    <div style={{ background: '#fff3cd', padding: '10px', borderRadius: '5px', marginBottom: '10px' }}>
+                                        ⚠️ No raw materials found. Please click "Manage Raw Materials" to create one first.
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="item-input-group">
+                                            <select 
+                                                value={itemProduct} 
+                                                onChange={(e) => setItemProduct(e.target.value)}
+                                                style={{ width: '45%' }}
+                                            >
+                                                <option value="">-- Raw Material --</option>
+                                                {rawMaterials.map(p => (
+                                                    <option key={p._id} value={p._id}>
+                                                        {p.name} ({p.productCode})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <input 
+                                                type="number" 
+                                                placeholder="Quantity (kg)" 
+                                                value={itemQuantity} 
+                                                onChange={(e) => setItemQuantity(Math.max(1, parseInt(e.target.value) || 1))} 
+                                                style={{ width: '15%' }}
+                                                min="1"
+                                            />
+                                            <input 
+                                                type="number" 
+                                                placeholder="Unit Cost (RWF)" 
+                                                value={itemCost} 
+                                                onChange={(e) => setItemCost(Math.max(0, parseFloat(e.target.value) || 0))} 
+                                                style={{ width: '20%' }}
+                                                min="0"
+                                                step="0.01"
+                                            />
+                                            <button 
+                                                type="button" 
+                                                className="btn-success" 
+                                                onClick={handleAddItem}
+                                                style={{ width: '20%' }}
+                                            >
+                                                Add Item
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                                
                                 <div style={{ marginTop: '15px' }}>
                                     {poFormData.poItems.length === 0 ? (
                                         <p style={{ color: '#999', fontStyle: 'italic' }}>No items added yet</p>
@@ -554,7 +592,7 @@ const PurchaseOrders: React.FC = () => {
                                         <table style={{ width: '100%', fontSize: '0.9em' }}>
                                             <thead>
                                                 <tr>
-                                                    <th>Product</th>
+                                                    <th>Raw Material</th>
                                                     <th>Qty</th>
                                                     <th>Cost/Unit</th>
                                                     <th>Subtotal</th>
@@ -563,13 +601,16 @@ const PurchaseOrders: React.FC = () => {
                                             </thead>
                                             <tbody>
                                                 {poFormData.poItems.map((item, index) => {
-                                                    const product = Array.isArray(availableProducts) 
-                                                        ? availableProducts.find(p => p._id === item.product)
-                                                        : null;
+                                                    const product = rawMaterials.find(p => p._id === item.product);
                                                     const subtotal = item.quantity * item.unitCost;
                                                     return (
                                                         <tr key={index}>
-                                                            <td>{product?.name || 'Unknown Product'}</td>
+                                                            <td>
+                                                                {product?.name || 'Unknown'}
+                                                                <div style={{ fontSize: '0.7em', color: '#888' }}>
+                                                                    {product?.productCode}
+                                                                </div>
+                                                            </td>
                                                             <td>{item.quantity}</td>
                                                             <td>{item.unitCost.toLocaleString('en-RW')}</td>
                                                             <td>{subtotal.toLocaleString('en-RW')} RWF</td>
@@ -615,7 +656,7 @@ const PurchaseOrders: React.FC = () => {
                 </div>
             )}
 
-            {/* --- PO Detail Modal --- */}
+            {/* PO Detail Modal */}
             {showPODetailModal && selectedPO && (
                 <div className="modal-backdrop">
                     <div className="modal-content wide-modal">
@@ -638,11 +679,11 @@ const PurchaseOrders: React.FC = () => {
                             </div>
                         </div>
 
-                        <h4>Items</h4>
+                        <h4>Raw Material Items</h4>
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Product</th>
+                                    <th>Raw Material</th>
                                     <th>Ordered</th>
                                     <th>Received</th>
                                     <th>Unit Cost</th>
@@ -653,7 +694,10 @@ const PurchaseOrders: React.FC = () => {
                             <tbody>
                                 {selectedPO.poItems.map((item: any, index: number) => (
                                     <tr key={index}>
-                                        <td>{item.name}</td>
+                                        <td>
+                                            {item.name}
+                                            <div style={{ fontSize: '0.7em', color: '#888' }}>Raw Material</div>
+                                        </td>
                                         <td>{item.quantity}</td>
                                         <td>{item.quantityReceived || 0}</td>
                                         <td>{item.unitCost?.toLocaleString('en-RW')}</td>
@@ -663,7 +707,7 @@ const PurchaseOrders: React.FC = () => {
                                                 <div style={{ fontSize: '0.8em' }}>
                                                     {item.batchNumbers.map((batch: string, i: number) => (
                                                         <div key={i} title={`Received: ${new Date(item.receivedDates?.[i]).toLocaleDateString()}`}>
-                                                            {batch}
+                                                            {batch.slice(-12)}
                                                         </div>
                                                     ))}
                                                 </div>
@@ -690,11 +734,11 @@ const PurchaseOrders: React.FC = () => {
                 </div>
             )}
 
-            {/* --- Receive Modal --- */}
+            {/* Receive Modal */}
             {showReceiveModal && selectedPO && (
                 <div className="modal-backdrop">
                     <div className="modal-content wide-modal">
-                        <h3>Receive Items from PO: {selectedPO.poNumber}</h3>
+                        <h3>Receive Raw Materials from PO: {selectedPO.poNumber}</h3>
                         
                         <div className="form-group">
                             <label>Notes (Optional)</label>
@@ -710,7 +754,7 @@ const PurchaseOrders: React.FC = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Product</th>
+                                    <th>Raw Material</th>
                                     <th>Ordered</th>
                                     <th>Remaining</th>
                                     <th>Quantity to Receive</th>
@@ -763,7 +807,7 @@ const PurchaseOrders: React.FC = () => {
                 </div>
             )}
 
-            {/* --- Payment Modal --- */}
+            {/* Payment Modal */}
             {showPaymentModal && selectedPO && (
                 <div className="modal-backdrop">
                     <div className="modal-content">
@@ -861,7 +905,7 @@ const PurchaseOrders: React.FC = () => {
                 </div>
             )}
 
-            {/* --- Cancel Modal --- */}
+            {/* Cancel Modal */}
             {showCancelModal && selectedPO && (
                 <div className="modal-backdrop">
                     <div className="modal-content">

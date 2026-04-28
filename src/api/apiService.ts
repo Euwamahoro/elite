@@ -185,4 +185,89 @@ export const getFinancialReport = (params: {
 }): Promise<AxiosResponse<any>> => 
     api.get('/reports/financial', { params });
 
+// ==================== RAW MATERIAL API Functions ====================
+
+// Get available raw materials for production (flat list of batches)
+export const getAvailableRawMaterials = (): Promise<AxiosResponse<{
+    success: boolean;
+    count: number;
+    batches: Array<{
+        stockId: string;
+        poNumber: string;
+        batchNumber: string;
+        productName: string;
+        quantity: number;
+        unitCost: number;
+        receivedDate: string;
+    }>;
+}>> => api.get('/raw-materials/available');
+
+// Get all raw materials stock (grouped by PO)
+export const getRawMaterialsStock = (): Promise<AxiosResponse<any>> => 
+    api.get('/raw-materials');
+
+// Get raw materials by specific PO
+export const getRawMaterialsByPO = (poId: string): Promise<AxiosResponse<any>> => 
+    api.get(`/raw-materials/po/${poId}`);
+
+// Get raw materials summary (totals and stats)
+export const getRawMaterialsSummary = (): Promise<AxiosResponse<any>> => 
+    api.get('/raw-materials/summary');
+
+// ==================== PRODUCTION API Functions ====================
+
+// Process production (consume raw material, create finished product batch)
+export const processProduction = (data: {
+    rawStockId: string;
+    finishedProductId: string;
+    quantityToConsume: number;
+    quantityToProduce: number;
+    unitCost?: number;
+    expiryDate?: string;
+    notes?: string;
+}): Promise<AxiosResponse<{
+    success: boolean;
+    message: string;
+    data: {
+        consumed: {
+            stockId: string;
+            productName: string;
+            batchNumber: string;
+            quantity: number;
+            remainingQuantity: number;
+        };
+        produced: {
+            productId: string;
+            productName: string;
+            batchNumber: string;
+            quantity: number;
+            unitCost: number;
+            unitOfMeasure: string;
+        };
+        poNumber: string;
+        poId: string;
+    };
+}>> => api.post('/products/process', data);
+
+// Get all POs that have available raw stock (legacy - kept for compatibility)
+export const getAvailablePOs = (): Promise<AxiosResponse<{
+    success: boolean;
+    count: number;
+    purchaseOrders: any[];
+}>> => api.get('/products/available-pos');
+
+// Get available raw batches for a specific PO (legacy - kept for compatibility)
+export const getAvailableRawBatches = (poId: string): Promise<AxiosResponse<{
+    success: boolean;
+    poId: string;
+    totalBatches: number;
+    batches: any[];
+}>> => api.get(`/products/available-batches/${poId}`);
+
+// Get production summary for a PO (legacy - kept for compatibility)
+export const getProductionSummary = (poId: string): Promise<AxiosResponse<{
+    success: boolean;
+    summary: any;
+}>> => api.get(`/products/production-summary/${poId}`);
+
 export default api;

@@ -1,4 +1,4 @@
-// src/types/models.ts - UPDATED VERSION WITH DASHBOARD TYPES
+// src/types/models.ts - FIXED VERSION
 
 // --- Core Entities ---
 
@@ -50,39 +50,41 @@ export interface StockLot {
     notes?: string;
 }
 
+// FIXED: Removed the index signature that was causing errors
 export interface Product {
     _id: string;
     category: ProductCategory;
     name: string;
+    productType?: 'raw' | 'finished';  // Made optional for backward compatibility
     productCode: string;
     description?: string;
     unitOfMeasure: string;
     stockLayers: StockLot[];
     minStockLevel: number;
-    // UPDATED: Added real sellingPrice field from backend
-    sellingPrice: number; 
-    totalStock: number;          
-    currentSellingPrice: number; 
-    isLowStock: boolean;         
+    sellingPrice: number;
+    totalStock: number;
+    currentSellingPrice?: number;  // Made optional
+    isLowStock: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
-
 
 // --- Product Form Data ---
 export interface ProductFormData {
-    category: string; 
+    category: string;
     name: string;
-    description: string;
+    description?: string;
     unitOfMeasure: string;
     minStockLevel?: number;
     productCode?: string;
-    // UPDATED: Added sellingPrice to form
-    sellingPrice: number; 
+    sellingPrice?: number;
+    productType?: 'raw' | 'finished';  // ADD THIS
 }
 
 // --- Order Entities ---
 export interface OrderItem {
-    product: string; // The Product ID when creating an order
-    name: string; // Product name at time of sale
+    product: string;
+    name: string;
     quantity: number;
     unitPrice: number;
     subtotal: number;
@@ -105,7 +107,7 @@ export interface OrderFormData {
     customerName: string;
     amountPaid: number;
     orderItems: {
-        product: string; // Only the Product ID
+        product: string;
         quantity: number;
     }[];
 }
@@ -126,13 +128,12 @@ export interface OrderDisplay extends Omit<Order, 'orderItems'> {
 export interface ExpenseRecord {
     _id: string;
     expenseName?: string;
-    expenseSubtype?: string; // New: Subtype field
-    expenseTypeName?: string; // New: For direct display
+    expenseSubtype?: string;
+    expenseTypeName?: string;
     expenseSubtypeName?: string;
     expenseType: { _id: string; name: string; };
     managerName: string;
     amount: number;
-
     dateOfExpense: string;
     notes: string;
     createdAt: string;
@@ -190,7 +191,6 @@ export interface PurchaseOrder {
     createdAt: string;
     updatedAt: string;
     
-    // Virtual properties
     daysOverdue?: number;
     paymentPercentage?: number;
     receivingPercentage?: number;
@@ -437,4 +437,63 @@ export interface StockLotFormData {
     unitPrice?: number;
     expiryDate?: string;
     notes?: string;
+}
+
+// ==================== RAW MATERIAL & PRODUCTION TYPES ====================
+
+// Raw Material Stock (from RawMaterialStock model)
+export interface RawMaterialStock {
+    _id: string;
+    poId: string;
+    poNumber: string;
+    batchNumber: string;
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    remainingQuantity: number;
+    receivedDate: string;
+    isFullyConsumed: boolean;
+}
+
+// Available raw material batch for production
+export interface AvailableRawBatch {
+    stockId: string;
+    poNumber: string;
+    batchNumber: string;
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    receivedDate: string;
+}
+
+// Production data for API call
+export interface ProductionData {
+    rawStockId: string;
+    finishedProductId: string;
+    quantityToConsume: number;
+    quantityToProduce: number;
+    unitCost?: number;
+    expiryDate?: string;
+    notes?: string;
+}
+
+// Production result
+export interface ProductionResult {
+    consumed: {
+        stockId: string;
+        productName: string;
+        batchNumber: string;
+        quantity: number;
+        remainingQuantity: number;
+    };
+    produced: {
+        productId: string;
+        productName: string;
+        batchNumber: string;
+        quantity: number;
+        unitCost: number;
+        unitOfMeasure: string;
+    };
+    poNumber: string;
+    poId: string;
 }
