@@ -1,11 +1,14 @@
-// src/pages/Orders.tsx - UPDATED
+// src/pages/Orders.tsx - UPDATED with Payment Method
 import React, { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { getOrders, createOrder, getProducts } from '../api/apiService';
-import { Order, OrderFormData, Product} from '../types/models';
+import { Order, OrderFormData, Product } from '../types/models';
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss, selectUser } from '../store/authSlice';
 import '../styles/Global.css'; 
+
+// Payment method options
+type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Credit';
 
 const initialFormData: OrderFormData = {
     customerName: '',
@@ -13,13 +16,26 @@ const initialFormData: OrderFormData = {
     orderItems: [],
 };
 
+// Extended form data with payment method
+interface OrderFormDataWithPayment extends OrderFormData {
+    paymentMethod: PaymentMethod;
+    mobileNumber?: string;
+    mobileProvider?: string;
+    referenceNumber?: string;
+    bankName?: string;
+    chequeNumber?: string;
+}
+
 const Orders: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState<OrderFormData>(initialFormData);
+    const [formData, setFormData] = useState<OrderFormDataWithPayment>({
+        ...initialFormData,
+        paymentMethod: 'Cash',
+    });
     const [selectedProductId, setSelectedProductId] = useState<string>('');
     const [itemQuantity, setItemQuantity] = useState<number>(1);
     const [totalOrderValue, setTotalOrderValue] = useState<number>(0);
@@ -34,7 +50,11 @@ const Orders: React.FC = () => {
                 getProducts(),
             ]);
             setOrders(ordersRes.data as Order[]);
-            setAvailableProducts(productsRes.data);
+            // Filter only finished products (not raw materials)
+            const finishedProducts = productsRes.data.filter(p => 
+                p.productType !== 'raw' && p.totalStock > 0
+            );
+            setAvailableProducts(finishedProducts);
             setError(null);
         } catch (error: any) {
             const backendMessage = error.response?.data?.message || 'Failed to fetch data.';
@@ -94,7 +114,6 @@ const Orders: React.FC = () => {
         for (const item of formData.orderItems) {
             const product = getProductDetails(item.product);
             if (product) {
-                // UPDATED: Use the master sellingPrice
                 const price = product.sellingPrice || 0;
                 estimatedTotal += item.quantity * price;
             }
@@ -113,11 +132,56 @@ const Orders: React.FC = () => {
             return;
         }
 
+        if (formData.amountPaid > totalOrderValue) {
+            setError('Amount paid cannot exceed total order value.');
+            return;
+        }
+
+        // Validate payment method specific fields
+        if (formData.paymentMethod === 'Mobile Money') {
+            if (!formData.mobileNumber) {
+                setError('Mobile number is required for Mobile Money payment.');
+                return;
+            }
+            if (!formData.mobileProvider) {
+                setError('Mobile provider is required for Mobile Money payment.');
+                return;
+            }
+        }
+        
+        if (formData.paymentMethod === 'Bank Transfer' && !formData.referenceNumber) {
+            setError('Reference number is required for Bank Transfer.');
+            return;
+        }
+        
+        if (formData.paymentMethod === 'Cheque' && !formData.chequeNumber) {
+            setError('Cheque number is required for Cheque payment.');
+            return;
+        }
+
         try {
-            await createOrder(formData);
+            // Prepare order data with payment info
+            const orderData = {
+                ...formData,
+                paymentDetails: {
+                    method: formData.paymentMethod,
+                    mobileNumber: formData.mobileNumber,
+                    mobileProvider: formData.mobileProvider,
+                    referenceNumber: formData.referenceNumber,
+                    bankName: formData.bankName,
+                    chequeNumber: formData.chequeNumber,
+                }
+            };
+            
+            await createOrder(orderData as any);
             alert('Order created successfully and stock updated!');
             setShowModal(false);
-            setFormData(initialFormData);
+            setFormData({ 
+                ...initialFormData, 
+                paymentMethod: 'Cash',
+                amountPaid: 0,
+                orderItems: []
+            });
             fetchOrdersAndProducts(); 
         } catch (error: any) {
             setError(error.response?.data?.message || 'Failed to create order.');
@@ -129,6 +193,17 @@ const Orders: React.FC = () => {
         if (status === 'Cleared') return 'status-cleared';
         if (status === 'Partial') return 'status-partial';
         return 'status-pending';
+    };
+
+    const getPaymentMethodIcon = (method: string) => {
+        switch(method) {
+            case 'Cash': return '💵';
+            case 'Mobile Money': return '📱';
+            case 'Bank Transfer': return '🏦';
+            case 'Cheque': return '📝';
+            case 'Credit': return '💳';
+            default: return '💰';
+        }
     };
 
     if (loading) return <Layout pageTitle="Sales Orders"><div>Loading Orders...</div></Layout>;
@@ -150,6 +225,7 @@ const Orders: React.FC = () => {
                         <th>Manager</th>
                         <th>Total Value</th>
                         <th>Paid</th>
+                        <th>Payment</th>
                         <th>Status</th>
                         <th>Date</th>
                         <th>Details</th>
@@ -163,6 +239,11 @@ const Orders: React.FC = () => {
                             <td>{order.managerName}</td>
                             <td>{order.totalAmount?.toLocaleString('en-RW')} RWF</td>
                             <td>{order.amountPaid?.toLocaleString('en-RW')} RWF</td>
+                            <td>
+                                <span>
+                                    {getPaymentMethodIcon((order as any).paymentMethod || 'Cash')} {(order as any).paymentMethod || 'Cash'}
+                                </span>
+                            </td>
                             <td>
                                 <span className={getPaymentStatusClass(order.paymentStatus)}>
                                     {order.paymentStatus}
@@ -178,12 +259,12 @@ const Orders: React.FC = () => {
             {/* --- Order Creation Modal --- */}
             {showModal && (
                 <div className="modal-backdrop">
-                    <div className="modal-content">
+                    <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
                         <h3>Record New Sale</h3>
                         <form onSubmit={handleSubmitOrder}>
                             
                             <div className="form-group">
-                                <label>Customer Name</label>
+                                <label>Customer Name *</label>
                                 <input 
                                     type="text" 
                                     value={formData.customerName} 
@@ -192,15 +273,103 @@ const Orders: React.FC = () => {
                                 />
                             </div>
 
+                            {/* --- Payment Method Selection --- */}
+                            <div className="form-group">
+                                <label>Payment Method *</label>
+                                <select 
+                                    value={formData.paymentMethod} 
+                                    onChange={(e) => setFormData(prev => ({...prev, paymentMethod: e.target.value as PaymentMethod}))}
+                                    required
+                                >
+                                    <option value="Cash">💵 Cash</option>
+                                    <option value="Mobile Money">📱 Mobile Money</option>
+                                    <option value="Bank Transfer">🏦 Bank Transfer</option>
+                                    <option value="Cheque">📝 Cheque</option>
+                                    <option value="Credit">💳 Credit (Invoice)</option>
+                                </select>
+                            </div>
+
+                            {/* Mobile Money Details */}
+                            {formData.paymentMethod === 'Mobile Money' && (
+                                <>
+                                    <div className="form-group">
+                                        <label>Mobile Provider *</label>
+                                        <select 
+                                            value={formData.mobileProvider || ''} 
+                                            onChange={(e) => setFormData(prev => ({...prev, mobileProvider: e.target.value}))}
+                                            required
+                                        >
+                                            <option value="">-- Select Provider --</option>
+                                            <option value="MTN Mobile Money">MTN Mobile Money</option>
+                                            <option value="Airtel Money">Airtel Money</option>
+                                            <option value="Tigo Cash">Tigo Cash</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Mobile Number *</label>
+                                        <input 
+                                            type="tel" 
+                                            value={formData.mobileNumber || ''} 
+                                            onChange={(e) => setFormData(prev => ({...prev, mobileNumber: e.target.value}))}
+                                            placeholder="e.g., 0788XXXXXX"
+                                            required
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Bank Transfer Details */}
+                            {formData.paymentMethod === 'Bank Transfer' && (
+                                <>
+                                    <div className="form-group">
+                                        <label>Bank Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={formData.bankName || ''} 
+                                            onChange={(e) => setFormData(prev => ({...prev, bankName: e.target.value}))}
+                                            placeholder="e.g., Bank of Kigali"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Reference Number *</label>
+                                        <input 
+                                            type="text" 
+                                            value={formData.referenceNumber || ''} 
+                                            onChange={(e) => setFormData(prev => ({...prev, referenceNumber: e.target.value}))}
+                                            placeholder="Transaction Reference Number"
+                                            required
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Cheque Details */}
+                            {formData.paymentMethod === 'Cheque' && (
+                                <div className="form-group">
+                                    <label>Cheque Number *</label>
+                                    <input 
+                                        type="text" 
+                                        value={formData.chequeNumber || ''} 
+                                        onChange={(e) => setFormData(prev => ({...prev, chequeNumber: e.target.value}))}
+                                        placeholder="Cheque Number"
+                                        required
+                                    />
+                                </div>
+                            )}
+
                             {/* --- Item Selection --- */}
                             <fieldset className="fieldset-items">
                                 <legend>Add Items</legend>
                                 <div className="item-input-group">
-                                    <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)} required={formData.orderItems.length === 0}>
+                                    <select 
+                                        value={selectedProductId} 
+                                        onChange={(e) => setSelectedProductId(e.target.value)} 
+                                        required={formData.orderItems.length === 0}
+                                        style={{ flex: 2 }}
+                                    >
                                         <option value="">-- Select Product --</option>
                                         {availableProducts.map(p => (
                                             <option key={p._id} value={p._id} disabled={p.totalStock === 0}>
-                                                {/* UPDATED DISPLAY: Name - Stock - Selling Price */}
                                                 {p.name} ({p.totalStock} {p.unitOfMeasure} @ {p.sellingPrice?.toLocaleString('en-RW') || 0} RWF)
                                             </option>
                                         ))}
@@ -209,56 +378,96 @@ const Orders: React.FC = () => {
                                         type="number" 
                                         value={itemQuantity} 
                                         min="1"
-                                        onChange={(e) => setItemQuantity(parseInt(e.target.value))} 
+                                        onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)} 
                                         style={{ width: '80px' }}
                                     />
-                                    <button type="button" className="btn-success btn-small" onClick={handleAddItem} disabled={!selectedProductId || itemQuantity <= 0}>Add</button>
+                                    <button 
+                                        type="button" 
+                                        className="btn-success btn-small" 
+                                        onClick={handleAddItem} 
+                                        disabled={!selectedProductId || itemQuantity <= 0}
+                                    >
+                                        Add
+                                    </button>
                                 </div>
 
                                 {/* Items List Display */}
-                                <div className="item-list-display">
-                                    {formData.orderItems.map((item, index) => {
-                                        const product = getProductDetails(item.product);
-                                        // UPDATED: use sellingPrice
-                                        const price = product?.sellingPrice || 0;
-                                        const subtotal = item.quantity * price;
-                                        return (
-                                            <div key={index} className="item-tag">
-                                                <span>{item.quantity} x {product?.name}</span>
-                                                <span>{subtotal.toLocaleString('en-RW')} RWF</span>
-                                                <button type="button" className="btn-delete btn-xs" onClick={() => handleRemoveItem(index)}>X</button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                {formData.orderItems.length > 0 && (
+                                    <div className="item-list-display" style={{ marginTop: '15px' }}>
+                                        <table style={{ width: '100%', fontSize: '13px' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '1px solid #ddd' }}>
+                                                    <th style={{ textAlign: 'left' }}>Product</th>
+                                                    <th style={{ textAlign: 'center' }}>Qty</th>
+                                                    <th style={{ textAlign: 'right' }}>Price</th>
+                                                    <th style={{ textAlign: 'right' }}>Subtotal</th>
+                                                    <th style={{ textAlign: 'center' }}>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {formData.orderItems.map((item, index) => {
+                                                    const product = getProductDetails(item.product);
+                                                    const price = product?.sellingPrice || 0;
+                                                    const subtotal = item.quantity * price;
+                                                    return (
+                                                        <tr key={index} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                                            <td style={{ padding: '8px 0' }}>{product?.name}</td>
+                                                            <td style={{ textAlign: 'center', padding: '8px 0' }}>{item.quantity}</td>
+                                                            <td style={{ textAlign: 'right', padding: '8px 0' }}>{price.toLocaleString('en-RW')} RWF</td>
+                                                            <td style={{ textAlign: 'right', padding: '8px 0' }}>{subtotal.toLocaleString('en-RW')} RWF</td>
+                                                            <td style={{ textAlign: 'center', padding: '8px 0' }}>
+                                                                <button type="button" className="btn-delete btn-xs" onClick={() => handleRemoveItem(index)}>X</button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr style={{ borderTop: '2px solid #ddd' }}>
+                                                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 'bold', padding: '8px 0' }}>Total:</td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 'bold', padding: '8px 0' }}>{totalOrderValue.toLocaleString('en-RW')} RWF</td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                )}
                             </fieldset>
 
                             {/* --- Financial Summary --- */}
-                            <div className="financial-summary">
-                                <p><strong>Estimated Total Value:</strong> {totalOrderValue.toLocaleString('en-RW')} RWF</p>
-                            </div>
-
                             <div className="form-group">
                                 <label>Amount Paid</label>
                                 <input 
-                                    type="text" 
+                                    type="number" 
                                     value={formData.amountPaid}
                                     onChange={(e) => setFormData(prev => ({
                                         ...prev, 
                                         amountPaid: parseFloat(e.target.value) || 0
                                     }))} 
+                                    min="0"
+                                    max={totalOrderValue}
+                                    step="100"
                                     required 
                                 />
                                 {formData.amountPaid < totalOrderValue && (
-                                    <p className="status-partial" style={{marginTop: '5px', padding: '5px'}}>
-                                        BALANCE DUE: {(totalOrderValue - formData.amountPaid).toLocaleString('en-RW')} RWF
+                                    <p className="status-partial" style={{marginTop: '5px', padding: '5px', background: '#fff3cd', borderRadius: '4px'}}>
+                                        ⚠️ BALANCE DUE: {(totalOrderValue - formData.amountPaid).toLocaleString('en-RW')} RWF
+                                    </p>
+                                )}
+                                {formData.amountPaid === totalOrderValue && totalOrderValue > 0 && (
+                                    <p className="status-cleared" style={{marginTop: '5px', padding: '5px', background: '#d4edda', borderRadius: '4px'}}>
+                                        ✅ FULLY PAID
                                     </p>
                                 )}
                             </div>
 
                             <div className="modal-actions">
-                                <button type="submit" className="btn-primary" disabled={formData.orderItems.length === 0}>Finalize Sale</button>
-                                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                                <button type="submit" className="btn-primary" disabled={formData.orderItems.length === 0}>
+                                    Finalize Sale
+                                </button>
+                                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>
+                                    Cancel
+                                </button>
                             </div>
                         </form>
                     </div>

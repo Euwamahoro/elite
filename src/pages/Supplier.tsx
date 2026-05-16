@@ -11,6 +11,7 @@ import {
 import { Supplier, SupplierFormData } from '../types/models';
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss } from '../store/authSlice';
+import SupplierDocuments from '../components/Supplier/SupplierDocuments';
 import '../styles/Global.css';
 
 const initialSupplierForm: SupplierFormData = {
@@ -31,9 +32,11 @@ const Suppliers: React.FC = () => {
     const [showModal, setShowModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+    const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
     const [statement, setStatement] = useState<any>(null);
     const [formData, setFormData] = useState<SupplierFormData>(initialSupplierForm);
     const [editing, setEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<'info' | 'documents'>('info');
     
     const [search, setSearch] = useState('');
     const [activeOnly, setActiveOnly] = useState(true);
@@ -49,41 +52,35 @@ const Suppliers: React.FC = () => {
                 order: 'asc'
             });
             
-            // Debug log to check response structure
-            console.log('Suppliers API Response:', response);
-            
-            // Handle different response structures
             let suppliersData: Supplier[] = [];
             
-            if (Array.isArray(response)) {
-                // If response itself is an array
-                suppliersData = response;
-            } else if (response && typeof response === 'object' && 'data' in response) {
-                const responseData = (response as any).data;
-                if (Array.isArray(responseData)) {
-                    // If response.data is an array
-                    suppliersData = responseData;
-                } else if (responseData && typeof responseData === 'object' && 'data' in responseData && Array.isArray((responseData as any).data)) {
-                    // If response.data.data is an array (nested structure)
-                    suppliersData = (responseData as any).data;
-                } else if (responseData && typeof responseData === 'object') {
-                    // Try to extract array from object
-                    for (const key in responseData) {
-                        if (Array.isArray((responseData as any)[key])) {
-                            suppliersData = (responseData as any)[key];
-                            break;
-                        }
-                    }
+            // Handle API response structure
+            if (response && response.data) {
+                const data = response.data;
+                // Check if data has suppliers array
+                if (data.suppliers && Array.isArray(data.suppliers)) {
+                    suppliersData = data.suppliers;
+                } 
+                // If data itself is an array
+                else if (Array.isArray(data)) {
+                    suppliersData = data;
                 }
+                // If data has data property that is array
+                else if (data.data && Array.isArray(data.data)) {
+                    suppliersData = data.data;
+                }
+            } 
+            // If response itself is an array
+            else if (Array.isArray(response)) {
+                suppliersData = response;
             }
             
-            console.log('Extracted suppliers data:', suppliersData);
-            setSuppliers(suppliersData || []);
+            setSuppliers(suppliersData);
             setError(null);
         } catch (error: any) {
             console.error('Error fetching suppliers:', error);
             setError(error.response?.data?.message || 'Failed to fetch suppliers.');
-            setSuppliers([]); // Ensure suppliers is always an array
+            setSuppliers([]);
         } finally {
             setLoading(false);
         }
@@ -144,12 +141,13 @@ const Suppliers: React.FC = () => {
                 getSupplierStatement(supplier._id)
             ]);
             
-            // Extract data from response (cast to any to handle both raw objects and Axios-like responses)
             const supplierData = (supplierRes as any).data?.data || (supplierRes as any).data || supplierRes;
             const statementData = (statementRes as any).data?.data || (statementRes as any).data || statementRes;
             
             setSelectedSupplier(supplierData as Supplier);
+            setSelectedSupplierId(supplier._id);
             setStatement(statementData);
+            setActiveTab('info');
             setShowDetailModal(true);
         } catch (error: any) {
             setError(error.response?.data?.message || 'Failed to fetch supplier details.');
@@ -169,6 +167,10 @@ const Suppliers: React.FC = () => {
         return 'status-cleared';
     };
 
+    const getDocumentCount = (supplier: Supplier) => {
+        return supplier.documents?.length || 0;
+    };
+
     if (loading) return <Layout pageTitle="Supplier Management"><div>Loading Suppliers...</div></Layout>;
 
     return (
@@ -182,7 +184,7 @@ const Suppliers: React.FC = () => {
                             placeholder="Search suppliers..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            style={{ width: '300px' }}
+                            style={{ width: '300px', padding: '8px', borderRadius: '5px', border: '1px solid #ddd' }}
                         />
                         <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                             <input
@@ -217,6 +219,7 @@ const Suppliers: React.FC = () => {
                         <th>Utilization</th>
                         <th>Payment Terms</th>
                         <th>Status</th>
+                        <th>Docs</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -241,27 +244,45 @@ const Suppliers: React.FC = () => {
                                         {supplier.isActive ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
-                                <td>
-                                    <button 
-                                        className="btn-info btn-small"
-                                        onClick={() => handleViewDetails(supplier)}
-                                    >
-                                        View
-                                    </button>
-                                    {isBoss && (
-                                        <button 
-                                            className="btn-edit btn-small"
-                                            onClick={() => handleEdit(supplier)}
-                                        >
-                                            Edit
-                                        </button>
+                                <td style={{ textAlign: 'center' }}>
+                                    {getDocumentCount(supplier) > 0 ? (
+                                        <span style={{ 
+                                            background: '#4caf50', 
+                                            color: 'white', 
+                                            padding: '2px 8px', 
+                                            borderRadius: '12px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {getDocumentCount(supplier)}
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: '#999', fontSize: '11px' }}>—</span>
                                     )}
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <button 
+                                            className="btn-info btn-small"
+                                            onClick={() => handleViewDetails(supplier)}
+                                        >
+                                            View
+                                        </button>
+                                        {isBoss && (
+                                            <button 
+                                                className="btn-edit btn-small"
+                                                onClick={() => handleEdit(supplier)}
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={10} style={{ textAlign: 'center', padding: '20px' }}>
+                            <td colSpan={11} style={{ textAlign: 'center', padding: '20px' }}>
                                 {!loading ? 'No suppliers found.' : 'Loading...'}
                             </td>
                         </tr>
@@ -382,78 +403,115 @@ const Suppliers: React.FC = () => {
             )}
 
             {/* --- Supplier Detail Modal --- */}
-            {showDetailModal && selectedSupplier && (
+            {showDetailModal && selectedSupplier && selectedSupplierId && (
                 <div className="modal-backdrop">
-                    <div className="modal-content wide-modal">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3>Supplier Details: {selectedSupplier.name}</h3>
+                    <div className="modal-content wide-modal" style={{ maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ margin: 0 }}>Supplier Details: {selectedSupplier.name}</h3>
                             <button className="btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                            <div>
-                                <h4>Contact Information</h4>
-                                <p><strong>Contact Person:</strong> {selectedSupplier.contactPerson}</p>
-                                <p><strong>Phone:</strong> {selectedSupplier.phoneNumber}</p>
-                                <p><strong>Email:</strong> {selectedSupplier.email || 'N/A'}</p>
-                                <p><strong>Address:</strong> {selectedSupplier.address}</p>
-                                <p><strong>Tax ID:</strong> {selectedSupplier.taxId || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <h4>Credit Information</h4>
-                                <p><strong>Credit Limit:</strong> {selectedSupplier.creditLimit?.toLocaleString('en-RW')} RWF</p>
-                                <p><strong>Current Balance:</strong> {selectedSupplier.currentBalance?.toLocaleString('en-RW')} RWF</p>
-                                <p><strong>Available Credit:</strong> {selectedSupplier.availableCredit?.toLocaleString('en-RW')} RWF</p>
-                                <p><strong>Credit Utilization:</strong> 
-                                    <span className={getCreditUtilizationClass(selectedSupplier.creditUtilization || 0)}>
-                                        {' '}{selectedSupplier.creditUtilization?.toFixed(1) || 0}%
-                                    </span>
-                                </p>
-                                <p><strong>Payment Terms:</strong> {selectedSupplier.paymentTerms}</p>
-                                <p><strong>Status:</strong> 
-                                    <span className={selectedSupplier.isActive ? 'status-cleared' : 'status-pending'}>
-                                        {' '}{selectedSupplier.isActive ? 'Active' : 'Inactive'}
-                                    </span>
-                                </p>
-                            </div>
+                        {/* Tabs */}
+                        <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid #ddd', marginBottom: '20px' }}>
+                            <button
+                                onClick={() => setActiveTab('info')}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: 'none',
+                                    border: 'none',
+                                    borderBottom: activeTab === 'info' ? '2px solid #4caf50' : 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: activeTab === 'info' ? 'bold' : 'normal',
+                                    color: activeTab === 'info' ? '#4caf50' : '#666'
+                                }}
+                            >
+                                📋 Basic Information
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('documents')}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: 'none',
+                                    border: 'none',
+                                    borderBottom: activeTab === 'documents' ? '2px solid #4caf50' : 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: activeTab === 'documents' ? 'bold' : 'normal',
+                                    color: activeTab === 'documents' ? '#4caf50' : '#666'
+                                }}
+                            >
+                                📄 Documents ({selectedSupplier.documents?.length || 0})
+                            </button>
                         </div>
 
-                        {statement && statement.purchaseOrders && statement.purchaseOrders.length > 0 ? (
+                        {/* Tab Content */}
+                        {activeTab === 'info' ? (
                             <>
-                                <h4>Recent Transactions</h4>
-                                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                    <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>PO Number</th>
-                                                <th>Date</th>
-                                                <th>Amount</th>
-                                                <th>Paid</th>
-                                                <th>Balance</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {statement.purchaseOrders.map((po: any) => (
-                                                <tr key={po._id}>
-                                                    <td>{po.poNumber}</td>
-                                                    <td>{new Date(po.createdAt).toLocaleDateString()}</td>
-                                                    <td>{po.grandTotal?.toLocaleString('en-RW')} RWF</td>
-                                                    <td>{po.amountPaid?.toLocaleString('en-RW')} RWF</td>
-                                                    <td>{po.balanceDue?.toLocaleString('en-RW')} RWF</td>
-                                                    <td>
-                                                        <span className={po.paymentStatus === 'Paid' ? 'status-cleared' : 'status-pending'}>
-                                                            {po.paymentStatus}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                                    <div>
+                                        <h4>Contact Information</h4>
+                                        <p><strong>Contact Person:</strong> {selectedSupplier.contactPerson}</p>
+                                        <p><strong>Phone:</strong> {selectedSupplier.phoneNumber}</p>
+                                        <p><strong>Email:</strong> {selectedSupplier.email || 'N/A'}</p>
+                                        <p><strong>Address:</strong> {selectedSupplier.address}</p>
+                                        <p><strong>Tax ID:</strong> {selectedSupplier.taxId || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <h4>Credit Information</h4>
+                                        <p><strong>Credit Limit:</strong> {selectedSupplier.creditLimit?.toLocaleString('en-RW')} RWF</p>
+                                        <p><strong>Current Balance:</strong> {selectedSupplier.currentBalance?.toLocaleString('en-RW')} RWF</p>
+                                        <p><strong>Available Credit:</strong> {selectedSupplier.availableCredit?.toLocaleString('en-RW')} RWF</p>
+                                        <p><strong>Credit Utilization:</strong> 
+                                            <span className={getCreditUtilizationClass(selectedSupplier.creditUtilization || 0)}>
+                                                {' '}{selectedSupplier.creditUtilization?.toFixed(1) || 0}%
+                                            </span>
+                                        </p>
+                                        <p><strong>Payment Terms:</strong> {selectedSupplier.paymentTerms}</p>
+                                        <p><strong>Status:</strong> 
+                                            <span className={selectedSupplier.isActive ? 'status-cleared' : 'status-pending'}>
+                                                {' '}{selectedSupplier.isActive ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </p>
+                                    </div>
                                 </div>
+
+                                {statement && statement.purchaseOrders && statement.purchaseOrders.length > 0 && (
+                                    <>
+                                        <h4>Recent Transactions</h4>
+                                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                            <table className="data-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>PO Number</th>
+                                                        <th>Date</th>
+                                                        <th>Amount</th>
+                                                        <th>Paid</th>
+                                                        <th>Balance</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {statement.purchaseOrders.map((po: any) => (
+                                                        <tr key={po._id}>
+                                                            <td>{po.poNumber}</td>
+                                                            <td>{new Date(po.createdAt).toLocaleDateString()}</td>
+                                                            <td>{po.grandTotal?.toLocaleString('en-RW')} RWF</td>
+                                                            <td>{po.amountPaid?.toLocaleString('en-RW')} RWF</td>
+                                                            <td>{po.balanceDue?.toLocaleString('en-RW')} RWF</td>
+                                                            <td>
+                                                                <span className={po.paymentStatus === 'Paid' ? 'status-cleared' : 'status-pending'}>
+                                                                    {po.paymentStatus}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         ) : (
-                            <p>No purchase orders found.</p>
+                            <SupplierDocuments supplierId={selectedSupplierId} />
                         )}
 
                         <div className="modal-actions">

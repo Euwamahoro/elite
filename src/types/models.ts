@@ -32,8 +32,24 @@ export interface Supplier {
     isActive: boolean;
     totalOrders: number;
     totalSpent: number;
-    availableCredit: number; // Virtual
-    creditUtilization: number; // Virtual
+    availableCredit: number;
+    creditUtilization: number;
+     documents?: SupplierDocument[];
+}
+
+// Supplier Document Interface
+export interface SupplierDocument {
+    _id: string;
+    fileName: string;
+    originalName: string;
+    fileType: string;
+    fileSize: number;
+    compressedSize?: number;
+    documentType: 'Tax Certificate' | 'Business License' | 'Contract' | 'ID/Passport' | 'Bank Details' | 'Other';
+    description?: string;
+    uploadedBy: string;
+    uploadedByName: string;
+    uploadedAt: string;
 }
 
 // --- Enhanced Stock Lot with Batch Numbers ---

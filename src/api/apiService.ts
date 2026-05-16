@@ -109,6 +109,65 @@ export const getSupplierStatement = (id: string, params?: {
     limit?: number;
 }): Promise<AxiosResponse<any>> => api.get(`/po/suppliers/${id}/statement`, { params });
 
+
+// ==================== SUPPLIER DOCUMENT API Functions ====================
+
+// Get all documents for a supplier
+export const getSupplierDocuments = (supplierId: string): Promise<AxiosResponse<{
+    success: boolean;
+    supplierName: string;
+    count: number;
+    documents: Array<{
+        _id: string;
+        fileName: string;
+        originalName: string;
+        fileType: string;
+        fileSize: number;
+        compressedSize?: number;
+        documentType: string;
+        description?: string;
+        uploadedByName: string;
+        uploadedAt: string;
+    }>;
+}>> => api.get(`/po/suppliers/${supplierId}/documents`);
+
+// Upload document for a supplier
+export const uploadSupplierDocument = (
+    supplierId: string, 
+    file: File, 
+    documentType: string, 
+    description?: string
+): Promise<AxiosResponse<any>> => {
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('documentType', documentType);
+    if (description) formData.append('description', description);
+    
+    return api.post(`/po/suppliers/${supplierId}/documents`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+};
+
+// Download a document
+export const downloadSupplierDocument = (supplierId: string, documentId: string): Promise<AxiosResponse<Blob>> => 
+    api.get(`/po/suppliers/${supplierId}/documents/${documentId}/download`, {
+        responseType: 'blob',
+    });
+
+// Delete a document
+export const deleteSupplierDocument = (supplierId: string, documentId: string): Promise<AxiosResponse<any>> => 
+    api.delete(`/po/suppliers/${supplierId}/documents/${documentId}`);
+
+// Update document metadata
+export const updateSupplierDocumentMetadata = (
+    supplierId: string, 
+    documentId: string, 
+    data: { documentType?: string; description?: string }
+): Promise<AxiosResponse<any>> => 
+    api.put(`/po/suppliers/${supplierId}/documents/${documentId}`, data);
+
 // ==================== PURCHASE ORDER API Functions ====================
 export const getPOs = (params?: {
     status?: string;
