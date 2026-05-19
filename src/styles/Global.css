@@ -747,3 +747,30 @@ body {
         break-inside: avoid;
     }
 }
+
+/* Login Page Logo Styles */
+.login-logo-container {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.login-logo {
+    max-width: 120px;
+    height: auto;
+    margin-bottom: 10px;
+}
+
+/* If you want the logo to be circular */
+.login-logo.circular {
+    border-radius: 50%;
+    object-fit: cover;
+    width: 100px;
+    height: 100px;
+}
+
+/* If you want the logo with background */
+.login-logo.with-bg {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 10px;
+}

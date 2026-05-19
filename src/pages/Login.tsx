@@ -5,9 +5,12 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, selectIsAuthenticated, selectIsBoss } from '../store/authSlice';
 import '../styles/Global.css'; 
 
+// Import the image from the imgs folder
+import companyLogo from '/imgs/elite.png'; // Adjust path as needed
+
 const Login: React.FC = () => {
-    const [email, setEmail] = useState('elitemovers@boss.com'); // Default for faster testing
-    const [password, setPassword] = useState('boss123'); // Default for faster testing
+    const [email, setEmail] = useState('elitemovers@boss.com');
+    const [password, setPassword] = useState('boss123');
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -16,10 +19,8 @@ const Login: React.FC = () => {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
 
-    // --- Redirection Logic (Runs on component load and state change) ---
     useEffect(() => {
         if (isAuthenticated) {
-            // Redirect based on role
             const redirectPath = isBoss ? '/dashboard/boss' : '/dashboard/manager';
             navigate(redirectPath, { replace: true });
         }
@@ -31,23 +32,29 @@ const Login: React.FC = () => {
         
         try {
             await dispatch(loginUser({ email, password }));
-            // Redirection happens in the useEffect hook after Redux state updates
         } catch (err) {
-            // The error is already handled and stored in Redux state by the thunk
+            // Error handled by Redux
         } finally {
             setIsSubmitting(false);
         }
     };
 
     if (isAuthenticated) {
-        return null; // Don't show login form if already authenticated, wait for redirect
+        return null;
     }
 
     return (
         <div className="login-container">
             <form className="login-form" onSubmit={handleSubmit}>
-                <h2>Elite Movers Login</h2>
-                {error && <p className="error-message">{error}</p>}
+                {/* Company Logo */}
+                <div className="login-logo-container">
+                    <img 
+                        src={companyLogo} 
+                        alt="Elite Movers Logo" 
+                        className="login-logo"
+                    />
+                </div>
+                    {error && <p className="error-message">{error}</p>}
                 
                 <div className="form-group">
                     <label>Email</label>
