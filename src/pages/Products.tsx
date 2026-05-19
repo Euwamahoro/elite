@@ -8,10 +8,10 @@ import {
     createProductCategory,
     updateProduct,
     getProductBatches,
+    getProductById,
     addStockLot,
-    getProductById
 } from '../api/apiService';
-import { Product, ProductCategory, ProductFormData, StockLotFormData } from '../types/models';
+import { Product, ProductCategory, ProductFormData } from '../types/models';
 import { useAppSelector } from '../store/hooks';
 import { selectIsBoss } from '../store/authSlice';
 import ProcessProductionModal from '../components/Production/ProcessProductionModal';
@@ -28,15 +28,6 @@ interface BatchModalProps {
 const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose }) => {
     const [batches, setBatches] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAddStockModal, setShowAddStockModal] = useState(false);
-    const [stockForm, setStockForm] = useState<StockLotFormData>({
-        poId: '',
-        unitCost: 0,
-        quantity: 1,
-        unitPrice: undefined,
-        expiryDate: '',
-        notes: ''
-    });
     const [batchStatusFilter, setBatchStatusFilter] = useState<string>('active');
 
     useEffect(() => {
@@ -51,27 +42,6 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
             console.error('Failed to fetch batches:', error.response?.data?.message || error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleAddStock = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!stockForm.unitCost || stockForm.unitCost <= 0) {
-            alert('Please enter a valid unit cost.');
-            return;
-        }
-        if (!stockForm.quantity || stockForm.quantity <= 0) {
-            alert('Please enter a valid quantity.');
-            return;
-        }
-        try {
-            await addStockLot(productId, stockForm);
-            alert('Stock added successfully! Batch number generated automatically.');
-            setShowAddStockModal(false);
-            setStockForm({ poId: '', unitCost: 0, quantity: 1, unitPrice: undefined, expiryDate: '', notes: '' });
-            fetchBatches();
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Failed to add stock.');
         }
     };
 
@@ -90,7 +60,6 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
     return (
         <div className="modal-backdrop">
             <div className="modal-content wide-modal">
-                {/* Batch Modal Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                     <div>
                         <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -116,10 +85,6 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                 <option value="expired">Expired Batches</option>
                                 <option value="inactive">Inactive Batches</option>
                             </select>
-                            <button className="prod-btn prod-btn--success" onClick={() => setShowAddStockModal(true)}>
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                                Add Stock
-                            </button>
                         </div>
                     </div>
                     <button className="prod-btn prod-btn--ghost" onClick={onClose}>Close</button>
@@ -166,7 +131,7 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                                                     {batch.quantity}
                                                 </span>
                                             </td>
-                                            <td>{batch.unitCost?.toLocaleString('en-RW')} RWF</td>
+                                            <td>{batch.unitCost?.toLocaleString('en-RW')} RWF\n</td>
                                             <td>{formatDate(batch.dateAcquired)}</td>
                                             <td>{batch.expiryDate ? formatDate(batch.expiryDate) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                                             <td>
@@ -191,42 +156,73 @@ const BatchModal: React.FC<BatchModalProps> = ({ productId, productName, onClose
                         </table>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
 
-                {/* Add Stock Modal */}
-                {showAddStockModal && (
-                    <div className="modal-backdrop">
-                        <div className="modal-content">
-                            <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>Add Stock — {productName}</h3>
-                            <form onSubmit={handleAddStock}>
-                                <div className="form-group">
-                                    <label>PO ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
-                                    <input type="text" value={stockForm.poId} onChange={(e) => setStockForm({...stockForm, poId: e.target.value})} placeholder="Enter PO ID if applicable" />
-                                    <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'block' }}>Leave blank for non-PO stock</small>
-                                </div>
-                                <div className="form-group">
-                                    <label>Unit Cost (RWF) <span style={{ color: '#A32D2D' }}>*</span></label>
-                                    <input type="number" value={stockForm.unitCost || ''} onChange={(e) => setStockForm({...stockForm, unitCost: parseFloat(e.target.value) || 0})} min="0.01" step="0.01" required />
-                                </div>
-                                <div className="form-group">
-                                    <label>Quantity <span style={{ color: '#A32D2D' }}>*</span></label>
-                                    <input type="number" value={stockForm.quantity || ''} onChange={(e) => setStockForm({...stockForm, quantity: parseInt(e.target.value) || 1})} min="1" required />
-                                </div>
-                                <div className="form-group">
-                                    <label>Expiry Date <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
-                                    <input type="date" value={stockForm.expiryDate || ''} onChange={(e) => setStockForm({...stockForm, expiryDate: e.target.value})} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Notes <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
-                                    <textarea value={stockForm.notes || ''} onChange={(e) => setStockForm({...stockForm, notes: e.target.value})} rows={2} placeholder="Any notes about this stock…" />
-                                </div>
-                                <div className="modal-actions">
-                                    <button type="submit" className="prod-btn prod-btn--primary">Add Stock</button>
-                                    <button type="button" className="prod-btn prod-btn--ghost" onClick={() => setShowAddStockModal(false)}>Cancel</button>
-                                </div>
-                            </form>
-                        </div>
+// --- Simple Add Stock Modal for Other Products ---
+interface SimpleAddStockModalProps {
+    productId: string;
+    productName: string;
+    sellingPrice: number;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+const SimpleAddStockModal: React.FC<SimpleAddStockModalProps> = ({ productId, productName, sellingPrice, onClose, onSuccess }) => {
+    const [quantity, setQuantity] = useState<number>(1);
+    const [isAdding, setIsAdding] = useState(false);
+
+    const handleAddStock = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (quantity <= 0) {
+            alert('Please enter a valid quantity.');
+            return;
+        }
+
+        setIsAdding(true);
+        try {
+            // Don't send poId for manual stock - only unitCost, quantity, unitPrice
+            await addStockLot(productId, {
+                unitCost: sellingPrice,
+                quantity: quantity,
+                unitPrice: sellingPrice,
+                notes: `Manual stock addition for ${productName}`
+            });
+            alert(`Added ${quantity} units to ${productName}`);
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Failed to add stock.');
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
+    return (
+        <div className="modal-backdrop">
+            <div className="modal-content" style={{ maxWidth: '400px' }}>
+                <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>Add Stock to {productName}</h3>
+                <form onSubmit={handleAddStock}>
+                    <div className="form-group">
+                        <label>Quantity *</label>
+                        <input 
+                            type="number" 
+                            value={quantity} 
+                            onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} 
+                            min="1" 
+                            required 
+                        />
+                        <small>Selling price: {sellingPrice.toLocaleString('en-RW')} RWF per unit</small>
                     </div>
-                )}
+                    <div className="modal-actions">
+                        <button type="submit" className="prod-btn prod-btn--primary" disabled={isAdding}>
+                            {isAdding ? 'Adding...' : 'Add Stock'}
+                        </button>
+                        <button type="button" className="prod-btn prod-btn--ghost" onClick={onClose}>Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
     );
@@ -244,6 +240,8 @@ const initialFormData: ProductFormData = {
 
 const Products: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
+    const [rawMaterials, setRawMaterials] = useState<Product[]>([]);
+    const [otherProducts, setOtherProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -252,41 +250,54 @@ const Products: React.FC = () => {
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showBatchModal, setShowBatchModal] = useState(false);
     const [showProcessModal, setShowProcessModal] = useState(false);
+    const [showSimpleAddStockModal, setShowSimpleAddStockModal] = useState(false);
     const [selectedProductForBatches, setSelectedProductForBatches] = useState<{id: string, name: string} | null>(null);
+    const [selectedProductForStock, setSelectedProductForStock] = useState<Product | null>(null);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [formData, setFormData] = useState<ProductFormData>(initialFormData);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState<'finished' | 'raw' | 'other'>('finished');
 
     const isBoss = useAppSelector(selectIsBoss);
 
     const fetchProductsAndCategories = async () => {
-    try {
-        const [productsRes, categoriesRes] = await Promise.all([
-            getProducts(),
-            getProductCategories(),
-        ]);
-        // Only show finished products (productType === 'finished')
-        const finishedProducts = productsRes.data.filter(p => p.productType === 'finished');
-        setProducts(finishedProducts);
-        setCategories(categoriesRes.data);
-        setError(null);
-    } catch (error: any) {
-        setError(error.response?.data?.message || 'Failed to fetch initial data.');
-    } finally {
-        setLoading(false);
-    }
-};
+        try {
+            const [productsRes, categoriesRes] = await Promise.all([
+                getProducts(),
+                getProductCategories(),
+            ]);
+            
+            const finished = productsRes.data.filter(p => p.productType === 'finished');
+            const raw = productsRes.data.filter(p => p.productType === 'raw');
+            const other = productsRes.data.filter(p => p.productType === 'other');
+            
+            setProducts(finished);
+            setRawMaterials(raw);
+            setOtherProducts(other);
+            setCategories(categoriesRes.data);
+            setError(null);
+        } catch (error: any) {
+            setError(error.response?.data?.message || 'Failed to fetch initial data.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         fetchProductsAndCategories();
     }, []);
 
-    const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const getFilteredProducts = () => {
+        const productList = activeTab === 'finished' ? products : activeTab === 'raw' ? rawMaterials : otherProducts;
+        return productList.filter(product =>
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.productCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.category.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    };
+
+    const filteredProducts = getFilteredProducts();
 
     const handleEdit = async (product: Product) => {
         try {
@@ -300,7 +311,8 @@ const Products: React.FC = () => {
                 unitOfMeasure: fullProduct.unitOfMeasure,
                 minStockLevel: fullProduct.minStockLevel || 0,
                 productCode: fullProduct.productCode || '',
-                sellingPrice: fullProduct.sellingPrice || 0
+                sellingPrice: fullProduct.sellingPrice || 0,
+                productType: fullProduct.productType || 'finished'
             });
             setShowModal(true);
         } catch (error: any) {
@@ -315,6 +327,11 @@ const Products: React.FC = () => {
 
     const handleProcessProduction = () => {
         setShowProcessModal(true);
+    };
+
+    const handleOpenSimpleAddStock = (product: Product) => {
+        setSelectedProductForStock(product);
+        setShowSimpleAddStockModal(true);
     };
 
     const handleCreateCategory = async (e: React.FormEvent) => {
@@ -390,7 +407,6 @@ const Products: React.FC = () => {
                             <span className="prod-count-badge">{filteredProducts.length}</span>
                         </h1>
                         <p className="prod-page-sub">Manage your products, stock levels and batches</p>
-                        {/* Search */}
                         <div className="prod-search-wrap">
                             <svg className="prod-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
                                 <path d="M6.5 11a4.5 4.5 0 100-9 4.5 4.5 0 000 9zM13 13l-2.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -424,6 +440,52 @@ const Products: React.FC = () => {
                             Process Production
                         </button>
                     </div>
+                </div>
+
+                {/* ── Tabs ───────────────────────────────────────── */}
+                <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid #ddd', marginBottom: '20px' }}>
+                    <button
+                        onClick={() => setActiveTab('finished')}
+                        style={{
+                            padding: '10px 20px',
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: activeTab === 'finished' ? '2px solid #4caf50' : 'none',
+                            cursor: 'pointer',
+                            fontWeight: activeTab === 'finished' ? 'bold' : 'normal',
+                            color: activeTab === 'finished' ? '#4caf50' : '#666'
+                        }}
+                    >
+                        🏭 Finished Products ({products.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('raw')}
+                        style={{
+                            padding: '10px 20px',
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: activeTab === 'raw' ? '2px solid #4caf50' : 'none',
+                            cursor: 'pointer',
+                            fontWeight: activeTab === 'raw' ? 'bold' : 'normal',
+                            color: activeTab === 'raw' ? '#4caf50' : '#666'
+                        }}
+                    >
+                        🌾 Raw Materials ({rawMaterials.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('other')}
+                        style={{
+                            padding: '10px 20px',
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: activeTab === 'other' ? '2px solid #ff9800' : 'none',
+                            cursor: 'pointer',
+                            fontWeight: activeTab === 'other' ? 'bold' : 'normal',
+                            color: activeTab === 'other' ? '#ff9800' : '#666'
+                        }}
+                    >
+                        📦 Other Products ({otherProducts.length})
+                    </button>
                 </div>
 
                 {/* ── Alerts ──────────────────────────────────────── */}
@@ -476,7 +538,7 @@ const Products: React.FC = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td style={{ fontWeight: 500 }}>{(product.sellingPrice ?? 0).toLocaleString('en-RW')} RWF</td>
+                                    <td style={{ fontWeight: 500 }}>{(product.sellingPrice ?? 0).toLocaleString('en-RW')} RWF\n</td>
                                     <td style={{ color: 'var(--text-secondary)' }}>{product.unitOfMeasure}</td>
                                     <td style={{ color: 'var(--text-secondary)' }}>{product.minStockLevel || 0}</td>
                                     <td>
@@ -492,14 +554,24 @@ const Products: React.FC = () => {
                                             <button className="prod-btn prod-btn--success prod-btn--sm" onClick={() => handleEdit(product)}>
                                                 Edit
                                             </button>
-                                            {/* Process button for all products - shows production modal */}
-                                            <button 
-                                                className="prod-btn prod-btn--primary prod-btn--sm" 
-                                                onClick={handleProcessProduction}
-                                                style={{ background: '#8B5CF6', borderColor: '#8B5CF6' }}
-                                            >
-                                                Process
-                                            </button>
+                                            {activeTab === 'finished' && (
+                                                <button 
+                                                    className="prod-btn prod-btn--primary prod-btn--sm" 
+                                                    onClick={handleProcessProduction}
+                                                    style={{ background: '#8B5CF6', borderColor: '#8B5CF6' }}
+                                                >
+                                                    Process
+                                                </button>
+                                            )}
+                                            {activeTab === 'other' && (
+                                                <button 
+                                                    className="prod-btn prod-btn--primary prod-btn--sm" 
+                                                    onClick={() => handleOpenSimpleAddStock(product)}
+                                                    style={{ background: '#ff9800', borderColor: '#ff9800' }}
+                                                >
+                                                    Add Stock
+                                                </button>
+                                            )}
                                             {isBoss && (
                                                 <button className="prod-btn prod-btn--danger prod-btn--sm" onClick={() => handleDelete(product._id, product.name)}>
                                                     Delete
@@ -516,7 +588,11 @@ const Products: React.FC = () => {
                         <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
                             {searchTerm
                                 ? <><div style={{ fontSize: '28px', marginBottom: '8px' }}>🔍</div><p style={{ margin: 0, fontSize: '14px' }}>No products matching "<strong>{searchTerm}</strong>"</p></>
-                                : <><div style={{ fontSize: '28px', marginBottom: '8px' }}>📦</div><p style={{ margin: 0, fontSize: '14px' }}>No products yet. Add your first product.</p></>
+                                : activeTab === 'finished'
+                                    ? <><div style={{ fontSize: '28px', marginBottom: '8px' }}>🏭</div><p style={{ margin: 0, fontSize: '14px' }}>No finished products yet. Create your first product.</p></>
+                                    : activeTab === 'raw'
+                                        ? <><div style={{ fontSize: '28px', marginBottom: '8px' }}>🌾</div><p style={{ margin: 0, fontSize: '14px' }}>No raw materials yet. Create raw materials in Purchase Orders page.</p></>
+                                        : <><div style={{ fontSize: '28px', marginBottom: '8px' }}>📦</div><p style={{ margin: 0, fontSize: '14px' }}>No other products yet. Click "New Product" to add sacks, weighing service, etc.</p></>
                             }
                         </div>
                     )}
@@ -542,6 +618,21 @@ const Products: React.FC = () => {
                                 <div className="form-group">
                                     <label>Product Name <span style={{ color: '#A32D2D' }}>*</span></label>
                                     <input type="text" name="name" value={formData.name} onChange={handleFormChange} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Product Type <span style={{ color: '#A32D2D' }}>*</span></label>
+                                    <select name="productType" value={formData.productType || 'finished'} onChange={handleFormChange} required>
+                                        <option value="finished">🏭 Finished Product (from production)</option>
+                                        <option value="raw">🌾 Raw Material (purchased, can be sold or processed)</option>
+                                        <option value="other">📦 Other Product (sacks, services, etc.)</option>
+                                    </select>
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                                        {formData.productType === 'raw' 
+                                            ? 'Raw materials can be sold directly or processed into finished goods.'
+                                            : formData.productType === 'other'
+                                                ? 'Other products are items like sacks, weighing services, etc. Add stock manually.'
+                                                : 'Finished products are created by processing raw materials.'}
+                                    </small>
                                 </div>
                                 <div className="form-group">
                                     <label>Standard Selling Price (RWF) <span style={{ color: '#A32D2D' }}>*</span></label>
@@ -614,6 +705,22 @@ const Products: React.FC = () => {
                 {showProcessModal && (
                     <ProcessProductionModal
                         onClose={() => setShowProcessModal(false)}
+                        onSuccess={() => {
+                            fetchProductsAndCategories();
+                        }}
+                    />
+                )}
+
+                {/* ── Simple Add Stock Modal (for Other Products) ──────── */}
+                {showSimpleAddStockModal && selectedProductForStock && (
+                    <SimpleAddStockModal
+                        productId={selectedProductForStock._id}
+                        productName={selectedProductForStock.name}
+                        sellingPrice={selectedProductForStock.sellingPrice}
+                        onClose={() => {
+                            setShowSimpleAddStockModal(false);
+                            setSelectedProductForStock(null);
+                        }}
                         onSuccess={() => {
                             fetchProductsAndCategories();
                         }}

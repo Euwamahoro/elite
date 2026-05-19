@@ -1,4 +1,4 @@
-// src/pages/Orders.tsx - UPDATED with Payment Method
+// src/pages/Orders.tsx - UPDATED with View Details Modal
 import React, { useState, useEffect, FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { getOrders, createOrder, getProducts } from '../api/apiService';
@@ -32,6 +32,8 @@ const Orders: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [formData, setFormData] = useState<OrderFormDataWithPayment>({
         ...initialFormData,
         paymentMethod: 'Cash',
@@ -50,11 +52,11 @@ const Orders: React.FC = () => {
                 getProducts(),
             ]);
             setOrders(ordersRes.data as Order[]);
-            // Filter only finished products (not raw materials)
-            const finishedProducts = productsRes.data.filter(p => 
-                p.productType !== 'raw' && p.totalStock > 0
-            );
-            setAvailableProducts(finishedProducts);
+            
+            // Show ALL products that have stock (both raw and finished)
+            const productsWithStock = productsRes.data.filter(p => p.totalStock > 0);
+            setAvailableProducts(productsWithStock);
+            
             setError(null);
         } catch (error: any) {
             const backendMessage = error.response?.data?.message || 'Failed to fetch data.';
@@ -119,7 +121,6 @@ const Orders: React.FC = () => {
             }
         }
         setTotalOrderValue(estimatedTotal);
-        // Auto-fill amount paid to total (can be edited)
         setFormData(prev => ({ ...prev, amountPaid: estimatedTotal })); 
     }, [formData.orderItems, availableProducts]);
 
@@ -160,7 +161,6 @@ const Orders: React.FC = () => {
         }
 
         try {
-            // Prepare order data with payment info
             const orderData = {
                 ...formData,
                 paymentDetails: {
@@ -187,6 +187,12 @@ const Orders: React.FC = () => {
             setError(error.response?.data?.message || 'Failed to create order.');
             console.error(error);
         }
+    };
+
+    // --- View Order Details ---
+    const handleViewOrder = (order: Order) => {
+        setSelectedOrder(order);
+        setShowDetailModal(true);
     };
 
     const getPaymentStatusClass = (status: string) => {
@@ -250,7 +256,14 @@ const Orders: React.FC = () => {
                                 </span>
                             </td>
                             <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                            <td><button className="btn-secondary btn-small">View</button></td>
+                            <td>
+                                <button 
+                                    className="btn-info btn-small" 
+                                    onClick={() => handleViewOrder(order)}
+                                >
+                                    View
+                                </button>
+                            </td>
                         </tr>
                     ))}
                 </tbody>
@@ -369,7 +382,7 @@ const Orders: React.FC = () => {
                                     >
                                         <option value="">-- Select Product --</option>
                                         {availableProducts.map(p => (
-                                            <option key={p._id} value={p._id} disabled={p.totalStock === 0}>
+                                            <option key={p._id} value={p._id}>
                                                 {p.name} ({p.totalStock} {p.unitOfMeasure} @ {p.sellingPrice?.toLocaleString('en-RW') || 0} RWF)
                                             </option>
                                         ))}
@@ -470,6 +483,94 @@ const Orders: React.FC = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- Order Details Modal --- */}
+            {showDetailModal && selectedOrder && (
+                <div className="modal-backdrop">
+                    <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ margin: 0 }}>Order Details</h3>
+                            <button className="btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
+                        </div>
+
+                        {/* Order Summary */}
+                        <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div>
+                                    <p><strong>Order ID:</strong> {selectedOrder._id.substring(18)}</p>
+                                    <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
+                                    <p><strong>Manager:</strong> {selectedOrder.managerName}</p>
+                                    <p><strong>Date:</strong> {new Date(selectedOrder.createdAt).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Total Amount:</strong> <span style={{ fontWeight: 'bold', color: '#2e7d32' }}>{selectedOrder.totalAmount?.toLocaleString('en-RW')} RWF</span></p>
+                                    <p><strong>Amount Paid:</strong> {selectedOrder.amountPaid?.toLocaleString('en-RW')} RWF</p>
+                                    <p><strong>Payment Method:</strong> {getPaymentMethodIcon((selectedOrder as any).paymentMethod || 'Cash')} {(selectedOrder as any).paymentMethod || 'Cash'}</p>
+                                    <p><strong>Payment Status:</strong> 
+                                        <span className={getPaymentStatusClass(selectedOrder.paymentStatus)}>
+                                            {' '}{selectedOrder.paymentStatus}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* Payment Details for non-Cash payments */}
+                            {(selectedOrder as any).paymentDetails && (selectedOrder as any).paymentDetails.method !== 'Cash' && (
+                                <div style={{ marginTop: '10px', padding: '10px', background: '#e3f2fd', borderRadius: '5px' }}>
+                                    <strong>Payment Details:</strong>
+                                    {(selectedOrder as any).paymentDetails.mobileNumber && (
+                                        <p>📱 Mobile: {(selectedOrder as any).paymentDetails.mobileProvider} {(selectedOrder as any).paymentDetails.mobileNumber}</p>
+                                    )}
+                                    {(selectedOrder as any).paymentDetails.referenceNumber && (
+                                        <p>🏦 Ref: {(selectedOrder as any).paymentDetails.referenceNumber}</p>
+                                    )}
+                                    {(selectedOrder as any).paymentDetails.chequeNumber && (
+                                        <p>📝 Cheque: {(selectedOrder as any).paymentDetails.chequeNumber}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Order Items */}
+                        <h4>Items Sold</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="data-table" style={{ width: '100%' }}>
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Qty</th>
+                                        <th>Unit Price</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedOrder.orderItems.map((item, index) => (
+                                        <tr key={index}>
+                                            <td>{item.name}</td>
+                                            <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                                            <td style={{ textAlign: 'right' }}>{item.unitPrice?.toLocaleString('en-RW')} RWF</td>
+                                            <td style={{ textAlign: 'right' }}>{(item.quantity * (item.unitPrice || 0)).toLocaleString('en-RW')} RWF</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: '2px solid #ddd' }}>
+                                        <td colSpan={3} style={{ textAlign: 'right', fontWeight: 'bold' }}>Total:</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{selectedOrder.totalAmount?.toLocaleString('en-RW')} RWF</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {/* Balance Info if not fully paid */}
+                        {selectedOrder.amountPaid < selectedOrder.totalAmount && (
+                            <div style={{ marginTop: '15px', padding: '10px', background: '#fff3cd', borderRadius: '5px' }}>
+                                ⚠️ <strong>Balance Due:</strong> {(selectedOrder.totalAmount - selectedOrder.amountPaid).toLocaleString('en-RW')} RWF
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

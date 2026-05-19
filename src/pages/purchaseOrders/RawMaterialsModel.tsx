@@ -87,7 +87,8 @@ const RawMaterialsModal: React.FC<RawMaterialsModalProps> = ({ isOpen, onClose, 
                 unitOfMeasure: newRawMaterial.unitOfMeasure,
                 sellingPrice: 0,
                 minStockLevel: 0,
-                description: newRawMaterial.description
+                description: newRawMaterial.description,
+                productType: 'raw'
             } as any);
             
             setSuccess(`Raw material "${newRawMaterial.name}" created successfully!`);
